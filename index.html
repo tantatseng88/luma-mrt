@@ -912,13 +912,13 @@ $("from").onchange=()=>{const v=$("from").value;if(v&&!returnTrip){try{localStor
 $("swap").onclick=()=>setTripMode(!returnTrip);
 // Back to the outward trip: saved starting station, the station nearest the selected event, original labels
 $("tripreset").onclick=()=>{$("from").value=savedFrom();setTripMode(false);if(current) showEvent();};
-// UK date and time format (dd/mm/yyyy, 24-hour), shown in Singapore time
-const fmtUK=d=>d.toLocaleString("en-GB",{timeZone:"Asia/Singapore",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",hour12:false})+" (Singapore time)";
+// Singapore date and time format, e.g. 12/10/2026, 3:45 pm
+function fmtSG(d){return d.toLocaleString("en-SG",{timeZone:"Asia/Singapore",day:"2-digit",month:"2-digit",year:"numeric",hour:"numeric",minute:"2-digit"})+" (Singapore time)";}
 // The deploy workflow swaps this placeholder for the time of the latest code change
 const BUILT_AT="__BUILT_AT__";
-$("app-updated").textContent=BUILT_AT.startsWith("__")?fmtUK(new Date(document.lastModified))+" · local preview":fmtUK(new Date(BUILT_AT));
+$("app-updated").textContent=BUILT_AT.startsWith("__")?fmtSG(new Date(document.lastModified))+" · local preview":fmtSG(new Date(BUILT_AT));
 function sgMeta(){
-  $("list-updated").textContent=fmtUK(new Date(sgFetched));$("sgmeta").textContent=SG_EVENTS.length+" upcoming public events from luma.com/discover/singapore. List fetched from Luma on "+fmt(new Date(sgFetched))+
+  $("list-updated").textContent=fmtSG(new Date(sgFetched));$("sgmeta").textContent=SG_EVENTS.length+" upcoming public events from luma.com/discover/singapore. List fetched from Luma on "+fmt(new Date(sgFetched))+
   ". The app's server fetches a new list every 3 hours.";}
 // Rebuilds the calendar: Luma Singapore events (with any registered addresses) plus the user's own events
 function showSg(keep){
@@ -1021,8 +1021,6 @@ if("serviceWorker" in navigator){
 }else{
   document.getElementById("upd-line").textContent="This browser can't check for new versions automatically. Reload the page to get the latest version.";
 }
-// Singapore date and time format, e.g. 12/10/2026, 3:45 pm
-function fmtSG(d){return d.toLocaleString("en-SG",{timeZone:"Asia/Singapore",day:"2-digit",month:"2-digit",year:"numeric",hour:"numeric",minute:"2-digit"})+" (Singapore time)";}
 
 // ---------- Close app ----------
 // Phones don't let web apps close themselves reliably: try, and if the app is still open, say how to close it
