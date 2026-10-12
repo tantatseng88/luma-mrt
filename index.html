@@ -66,8 +66,11 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .daybar{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
 .evlist .t{font-family:var(--mono);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
 .evlist{display:flex;flex-direction:column;gap:6px}
-.evlist button{text-align:left;font:inherit;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;cursor:pointer}
-.evlist button[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.evlist button,.evlist a{display:block;text-align:left;font:inherit;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;cursor:pointer;text-decoration:none}
+.evlist button[aria-pressed="true"],.evlist a[aria-current="true"]{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.ext{float:right;margin-left:8px;font-size:12px;font-weight:700;color:var(--accent);white-space:nowrap}
+#ev-title a{color:inherit;text-decoration-color:var(--accent);text-underline-offset:3px}
+#ev-title a span{color:var(--accent);font-size:.8em}
 .meta{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px}.meta dt{color:var(--muted)}.meta dd{margin:0;min-width:0;overflow-wrap:anywhere}
 .tag{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
 .summary{display:flex;flex-wrap:wrap;gap:18px;align-items:baseline}
@@ -342,11 +345,18 @@ function renderDay(){
   const label=selDay?new Date(selDay+"T00:00:00Z").toLocaleDateString("en-SG",{weekday:"short",day:"numeric",month:"short",timeZone:"UTC"}):"";
   box.innerHTML='<h2>'+esc(label)+' · '+(list.length?list.length+" event"+(list.length>1?"s":""):"no events")+'</h2>';
   if(!list.length){box.insertAdjacentHTML("beforeend",'<p class="hint">Nothing on this day. Pick a date with a dot.</p>');return;}
-  list.forEach(e=>{const b=document.createElement("button");b.type="button";b.setAttribute("aria-pressed",e===current);
-    b.innerHTML='<span class="t"></span> <strong></strong><br><span class="small"></span>';
+  list.forEach(e=>{
+    // Events with a Luma page open it in a new tab; tapping also selects the event so its route is ready on return
+    const url=safeUrl(e.url), b=document.createElement(url?"a":"button");
+    if(url){b.href=url;b.target="_blank";b.rel="noopener";b.setAttribute("aria-current",e===current);}
+    else{b.type="button";b.setAttribute("aria-pressed",e===current);}
+    b.innerHTML=(url?'<span class="ext">Luma ↗</span>':'')+'<span class="t"></span> <strong></strong><br><span class="small"></span>';
     b.querySelector(".t").textContent=fmtT(e.start);b.querySelector("strong").textContent=e.title||"Untitled";b.querySelector(".small").textContent=e.loc||"No venue listed";
-    b.onclick=()=>{current=e;renderDay();showEvent();$("ev-title").scrollIntoView({block:"nearest",behavior:"smooth"});};box.append(b);});
+    if(url) b.setAttribute("aria-label",(e.title||"Untitled")+", "+fmtT(e.start)+". Opens on Luma in a new tab");
+    b.onclick=()=>{current=e;renderDay();showEvent();};box.append(b);});
 }
+// Only follow http(s) links, so a calendar file can't inject other link types
+function safeUrl(u){try{const x=new URL(u);return /^https?:$/.test(x.protocol)?x.href:"";}catch(_){return "";}}
 function guessStation(loc){
   if(!loc) return "";const t=loc.toLowerCase();
   for(const [k,v] of Object.entries(LANDMARKS)) if(t.includes(k)) return v;
@@ -354,7 +364,10 @@ function guessStation(loc){
   return hit||"";
 }
 function showEvent(){
-  const e=current;$("ev-title").textContent=e.title||"Untitled event";
+  const e=current,url=safeUrl(e.url),h=$("ev-title");h.textContent="";
+  if(url){const a=document.createElement("a");a.href=url;a.target="_blank";a.rel="noopener";a.textContent=(e.title||"Untitled event")+" ";
+    a.insertAdjacentHTML("beforeend",'<span aria-hidden="true">↗</span>');a.title="Open on Luma";h.append(a);}
+  else h.textContent=e.title||"Untitled event";
   $("ev-tag").textContent=e.src==="sg"?"Luma Singapore":"Loaded";$("ev-when").textContent=fmt(e.start);
   $("ev-loc").textContent=e.loc||(e.approx?"Exact address shown on Luma after you register. Area only.":"No venue listed");
   if(e.ll){const near=nearestStations(e.ll);$("to").value=near[0].s;
@@ -393,7 +406,7 @@ function render(){
    '<a target="_blank" rel="noopener" href="'+mapsLink(to+" MRT Station, Singapore",venue,"walking")+'">Walking directions from '+esc(to)+'</a>'+
    '<a target="_blank" rel="noopener" href="'+mapsLink(from+" MRT Station, Singapore",venue,"transit")+'">Full trip in Google Maps</a>'+
    '<a target="_blank" rel="noopener" href="https://www.onemap.gov.sg/">OneMap</a>'+
-   (current&&current.url?'<a target="_blank" rel="noopener" href="'+esc(current.url)+'">Luma event page</a>':"")+'</div>';
+   (current&&safeUrl(current.url)?'<a target="_blank" rel="noopener" href="'+esc(safeUrl(current.url))+'">Luma event page</a>':"")+'</div>';
   if(r&&r.legs.length>1) html+='<p class="hint">Interchange'+(r.legs.length>2?"s":"")+': '+r.legs.slice(0,-1).map(l=>esc(l.stops.at(-1))).join(", ")+'.</p>';
   box.innerHTML=html;
 }
