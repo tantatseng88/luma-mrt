@@ -70,7 +70,18 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .day.today{border-color:var(--fg)}
 .day[aria-pressed="true"]{background:var(--accent);color:var(--onaccent);border-color:var(--accent)}
 .dots{display:flex;gap:2px;height:5px}.dots i{width:5px;height:5px;border-radius:50%;background:var(--accent)}
+.dots i.apt{background:var(--food)}
 .day[aria-pressed="true"] .dots i{background:var(--onaccent)}
+.aptform{display:flex;flex-direction:column;gap:10px}
+.row3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}@media (max-width:480px){.row3{grid-template-columns:1fr 1fr}.row3>div:first-child{grid-column:1/-1}}
+.opt{font-weight:400;color:var(--muted)}
+.aptlist{display:flex;flex-direction:column;gap:8px}
+.apt-row{border:1px solid var(--line);border-left:4px solid var(--food);border-radius:8px;padding:10px 12px;background:var(--bg);display:flex;flex-direction:column;gap:4px}
+.apt-row.past{opacity:.65}
+.apt-row strong{font-size:16px}
+.apt-row .acts{display:flex;flex-wrap:wrap;gap:14px;margin-top:2px}
+.tag.apt{color:var(--food);border-color:var(--food)}
+.err{color:var(--ns)}
 .daybar{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
 .evlist{display:flex;flex-direction:column;gap:10px}
 .evitem{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:14px 16px;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
@@ -184,8 +195,7 @@ code{font-family:var(--mono);font-size:13px}
   <div class="tabs" role="tablist">
     <button role="tab" id="t-sg" aria-selected="true" data-tab="sg">Luma Singapore</button>
     <button role="tab" id="t-ics" aria-selected="false" data-tab="ics">My registration</button>
-    <button role="tab" id="t-url" aria-selected="false" data-tab="url">Event link</button>
-    <button role="tab" id="t-man" aria-selected="false" data-tab="man">Type it in</button>
+    <button role="tab" id="t-apt" aria-selected="false" data-tab="apt">My appointments</button>
   </div>
 
   <div data-pane="sg">
@@ -213,21 +223,27 @@ code{font-family:var(--mono);font-size:13px}
       <button class="btn" id="icsparse" style="margin-top:6px">Add from pasted text</button>
     </details>
   </div>
-  <div data-pane="url" hidden>
-    <label for="evurl">Luma event link</label>
-    <input id="evurl" type="url" placeholder="https://luma.com/abc123">
-    <p class="note" style="margin-top:8px">The app can't read Luma event pages directly. The link is kept for the map buttons; fill in the event details under "Type it in".</p>
-  </div>
-  <div data-pane="man" hidden>
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <div><label for="m-title">Event name</label><input id="m-title"></div>
-      <div class="row">
-        <div><label for="m-date">Date</label><input id="m-date" type="date"></div>
-        <div><label for="m-time">Start time (SGT)</label><input id="m-time" type="time"></div>
+  <div data-pane="apt" hidden>
+    <p style="margin:0 0 10px">Add appointments that aren't on Luma, like a meeting or a dinner. They show on the calendar and are saved on this phone.</p>
+    <form id="aptform" class="aptform" novalidate>
+      <div><label for="a-title">Name</label><input id="a-title" placeholder="e.g. Dinner with Sam" autocomplete="off"></div>
+      <div class="row3">
+        <div><label for="a-date">Date</label><input id="a-date" type="date"></div>
+        <div><label for="a-start">Start time</label><input id="a-start" type="time"></div>
+        <div><label for="a-end">End time <span class="opt">(optional)</span></label><input id="a-end" type="time"></div>
       </div>
-      <div><label for="m-loc">Venue or address</label><input id="m-loc"></div>
-      <button class="btn primary" id="m-use">Use this event</button>
-    </div>
+      <div><label for="a-loc">Place or address <span class="opt">(optional)</span></label><input id="a-loc" placeholder="e.g. Jewel Changi Airport" autocomplete="off"></div>
+      <div><label for="a-stn">Station nearest the place</label><select id="a-stn"></select></div>
+      <div><label for="a-url">Link <span class="opt">(optional)</span></label><input id="a-url" type="url" placeholder="https://" autocomplete="off"></div>
+      <p class="hint" style="margin:0">Times are Singapore time.</p>
+      <div class="triprow">
+        <button type="submit" class="btn primary" id="a-save">Save appointment</button>
+        <button type="button" class="btn" id="a-cancel" hidden>Cancel editing</button>
+      </div>
+      <p class="hint" id="a-state" aria-live="polite" style="margin:0"></p>
+    </form>
+    <h2 style="margin:16px 0 8px">Saved appointments</h2>
+    <div id="aptlist" class="aptlist"></div>
   </div>
 
   <div class="cal" aria-label="Event calendar">
@@ -377,12 +393,21 @@ function route(from,to){
 
 // ---------- event handling ----------
 const $=id=>document.getElementById(id);
-let events=[], current=null, eventUrl="", view={y:0,m:0}, selDay="";
+let events=[], current=null, view={y:0,m:0}, selDay="";
 const toEvents=list=>list.map(e=>({id:e.i||"",title:e.t,start:new Date(e.s),end:e.e?new Date(e.e):null,url:e.u,ll:e.ll,loc:e.l,approx:!e.l,src:"sg"}));
 // Starts with the list built into the page; replaced by events.json, which a GitHub Action updates every 3 hours
 let SG_EVENTS=toEvents(LUMA_SNAPSHOT.events), sgFetched=LUMA_SNAPSHOT.fetched;
-// Events from calendar files or typed in that aren't in the Luma Singapore list
+// Events from calendar files that aren't in the Luma Singapore list
 let extraEvents=[];
+// The user's own non-Luma appointments, saved on this phone
+const APT_KEY="lm-appointments";
+let APTS=(()=>{try{const a=JSON.parse(localStorage.getItem(APT_KEY)||"[]");return Array.isArray(a)?a:[];}catch(_){return [];}})(), editingApt=null;
+const saveApts=()=>{try{localStorage.setItem(APT_KEY,JSON.stringify(APTS));return true;}catch(_){return false;}};
+const aptEvents=()=>APTS.map(a=>({id:a.id,title:a.title,start:new Date(a.start),end:a.end?new Date(a.end):null,loc:a.loc||"",stn:a.stn||"",url:a.url||"",src:"apt"}));
+// Date and time parts in Singapore time, for filling the form's date and time fields
+function sgParts(d){const p=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Singapore",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(d);
+  const g=t=>p.find(x=>x.type===t).value;return {date:g("year")+"-"+g("month")+"-"+g("day"),time:g("hour")+":"+g("minute")};}
+const sgDate=(date,time)=>parseDT(date.replace(/-/g,"")+"T"+time.replace(":","")+"00",[]);
 // Addresses from the user's own Luma calendar files, keyed by Luma event id and link; kept on this device only
 const REG_KEY="lm-registered";
 let REG=(()=>{try{return JSON.parse(localStorage.getItem(REG_KEY)||"{}")||{};}catch(_){return {};}})();
@@ -442,15 +467,16 @@ function goToDay(k){selDay=k;const [y,m]=k.split("-").map(Number);view={y,m:m-1}
 function renderCal(){
   const {y,m}=view, today=dayKey(new Date());
   $("calmonth").textContent=new Date(Date.UTC(y,m,1)).toLocaleString("en-SG",{month:"long",year:"numeric",timeZone:"UTC"});
-  const counts={};events.forEach(e=>{const k=dayKey(e.start);counts[k]=(counts[k]||0)+1;});
+  // One dot per event (up to 3); the user's own appointments get their own colour
+  const byDay={};events.forEach(e=>{const k=dayKey(e.start);(byDay[k]=byDay[k]||[]).push(e.src==="apt");});
   const lead=(new Date(Date.UTC(y,m,1)).getUTCDay()+6)%7, days=new Date(Date.UTC(y,m+1,0)).getUTCDate();
   let h=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d=>'<div class="dow">'+d+'</div>').join("")+"<div></div>".repeat(lead);
   for(let d=1;d<=days;d++){
-    const k=y+"-"+String(m+1).padStart(2,"0")+"-"+String(d).padStart(2,"0"), n=counts[k]||0;
+    const k=y+"-"+String(m+1).padStart(2,"0")+"-"+String(d).padStart(2,"0"), dayEv=byDay[k]||[], n=dayEv.length;
     const cls=["day",n?"has":"",k<today?"past":"",k===today?"today":""].join(" ");
     const label=new Date(Date.UTC(y,m,d)).toLocaleDateString("en-SG",{weekday:"long",day:"numeric",month:"long",timeZone:"UTC"})+(n?", "+n+" event"+(n>1?"s":""):", no events");
     h+='<button type="button" class="'+cls+'" data-k="'+k+'" aria-pressed="'+(k===selDay)+'" aria-label="'+label+'">'+d+
-       '<span class="dots">'+"<i></i>".repeat(Math.min(n,3))+'</span></button>';
+       '<span class="dots">'+dayEv.slice().sort((a,b)=>b-a).slice(0,3).map(apt=>apt?'<i class="apt"></i>':'<i></i>').join("")+'</span></button>';
   }
   $("calgrid").innerHTML=h;
   $("calgrid").querySelectorAll(".day").forEach(b=>b.onclick=()=>{selDay=b.dataset.k;renderCal();});
@@ -470,11 +496,15 @@ function renderDay(){
     c.className="evitem";c.setAttribute("aria-current",e===current);c.tabIndex=0;
     c.setAttribute("aria-label",(e.title||"Untitled event")+", "+fmt(e.start)+(e===current?". Selected":". Select to plan the route"));
     c.innerHTML='<h3>'+esc(e.title||"Untitled event")+'</h3>'+
-      '<div class="evtags"><span class="tag">'+(e.registered?"Registered":e.src==="sg"?"Luma Singapore":"Added by you")+'</span>'+
-      (url?'<a class="lumalink" href="'+esc(url)+'" target="_blank" rel="noopener" aria-label="Open this event on Luma">Luma <span aria-hidden="true">↗</span></a>':'')+'</div>'+
-      '<dl class="meta"><dt>When</dt><dd>'+esc(fmt(e.start))+'</dd><dt>Venue</dt><dd class="v"></dd></dl>';
+      '<div class="evtags"><span class="tag'+(e.src==="apt"?' apt':'')+'">'+(e.src==="apt"?"My appointment":e.registered?"Registered":e.src==="sg"?"Luma Singapore":"From your calendar")+'</span>'+
+      (url?'<a class="lumalink" href="'+esc(url)+'" target="_blank" rel="noopener" aria-label="Open this event'+(slugOf(url)?' on Luma':"'s link")+'">'+(slugOf(url)?"Luma":"Link")+' <span aria-hidden="true">↗</span></a>':'')+
+      (e.src==="apt"?'<button type="button" class="linkbtn lumalink" data-edit>Edit</button>':'')+'</div>'+
+      '<dl class="meta"><dt>When</dt><dd>'+esc(fmt(e.start)+(e.end&&e.src==="apt"?" to "+fmtT(e.end):""))+'</dd><dt>Venue</dt><dd class="v"></dd></dl>';
     const v=c.querySelector(".v");
-    if(e.loc||!e.approx) v.textContent=e.loc||"No venue listed";
+    const editBtn=c.querySelector("[data-edit]");
+    if(editBtn) editBtn.onclick=ev=>{ev.stopPropagation();const a=APTS.find(x=>x.id===e.id);if(!a) return;goTab("apt");aptForm(a);$("a-state").textContent="Editing “"+a.title+"”.";$("a-title").focus();};
+    if(e.src==="apt") v.textContent=[e.loc,e.stn?"near "+e.stn+" MRT":""].filter(Boolean).join(" · ")||"No place given";
+    else if(e.loc||!e.approx) v.textContent=e.loc||"No venue listed";
     else{v.innerHTML="Hidden in Luma's public list. If you've registered, see it on Luma, or "+
       '<button type="button" class="linkbtn">add your registration</button> to show it here.';
       v.querySelector("button").onclick=ev=>{ev.stopPropagation();goTab("ics");$("icsfile").focus();};}
@@ -493,7 +523,8 @@ function guessStation(loc){
 }
 function showEvent(){
   const e=current;
-  if(e.ll){const near=nearestStations(e.ll);$("to").value=near[0].s;
+  if(e.stn&&byStation.has(e.stn)){$("to").value=e.stn;$("tohint").textContent="The station you chose for this appointment.";}
+  else if(e.ll){const near=nearestStations(e.ll);$("to").value=near[0].s;
     $("tohint").textContent="Nearest to the event"+(e.approx?" area":"")+": "+near.map(x=>x.s+" (~"+Math.round(x.m/10)*10+" m)").join(", ")+". Distances are straight-line.";}
   else if(guessStation(e.loc)){const g=guessStation(e.loc);$("to").value=g;$("tohint").textContent="Matched \""+g+"\" from the venue text. Change it if that's wrong.";}
   else{$("to").value="";$("tohint").textContent="Couldn't match a station from the venue text. Pick the closest one.";}
@@ -576,6 +607,7 @@ function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",
 
 // ---------- wiring ----------
 for(const id of ["from","to"]){const sel=$(id);sel.innerHTML='<option value="">Select a station</option>'+STATIONS.map(s=>'<option>'+esc(s)+'</option>').join("");sel.onchange=render;}
+$("a-stn").innerHTML='<option value="">Work it out from the address</option>'+STATIONS.map(s=>'<option>'+esc(s)+'</option>').join("");
 function goTab(name){document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x.dataset.tab===name));
   document.querySelectorAll("[data-pane]").forEach(p=>p.hidden=p.dataset.pane!==name);}
 document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>goTab(b.dataset.tab));
@@ -608,12 +640,58 @@ function importICS(text){
 function readFile(f){const rd=new FileReader();rd.onload=()=>importICS(String(rd.result));rd.readAsText(f);}
 $("icsfile").onchange=e=>{const f=e.target.files[0];if(f) readFile(f);e.target.value="";};
 $("icsparse").onclick=()=>importICS($("icstext").value);
-$("evurl").oninput=e=>{eventUrl=e.target.value.trim();if(current&&!current.sample) {current.url=eventUrl;render();}};
-$("m-use").onclick=()=>{const d=$("m-date").value,t=$("m-time").value||"19:00";
-  const start=d?parseDT(d.replace(/-/g,"")+"T"+t.replace(":","")+"00",[]):null;
-  if(!start){$("m-date").focus();return;}
-  const ev={title:$("m-title").value||"My event",start,loc:$("m-loc").value,url:eventUrl,src:"manual"};
-  extraEvents.push(ev);showSg(ev);};
+// ---------- My appointments: non-Luma events, saved on this phone ----------
+function aptForm(a){
+  const p=a?sgParts(new Date(a.start)):null;
+  $("a-title").value=a?a.title:"";$("a-date").value=p?p.date:"";$("a-start").value=p?p.time:"";
+  $("a-end").value=a&&a.end?sgParts(new Date(a.end)).time:"";$("a-loc").value=a?a.loc||"":"";
+  $("a-stn").value=a?a.stn||"":"";$("a-url").value=a?a.url||"":"";
+  editingApt=a?a.id:null;$("a-save").textContent=a?"Save changes":"Save appointment";$("a-cancel").hidden=!a;
+}
+function renderApts(){
+  const box=$("aptlist"), list=APTS.slice().sort((x,y)=>x.start.localeCompare(y.start)), now=Date.now();
+  $("t-apt").textContent="My appointments"+(APTS.length?" ("+APTS.length+")":"");
+  if(!list.length){box.innerHTML='<p class="hint">None yet. Saved appointments appear here and on the calendar.</p>';return;}
+  box.innerHTML="";
+  list.forEach(a=>{
+    const s=new Date(a.start), row=document.createElement("div");
+    row.className="apt-row"+(new Date(a.end||a.start).getTime()<now?" past":"");
+    row.innerHTML='<strong></strong><span class="small t"></span><span class="small p"></span><div class="acts">'+
+      '<button type="button" class="linkbtn" data-a="show">Show on calendar</button><button type="button" class="linkbtn" data-a="edit">Edit</button>'+
+      '<button type="button" class="linkbtn err" data-a="del">Delete</button></div>';
+    row.querySelector("strong").textContent=a.title;
+    row.querySelector(".t").textContent=fmt(s)+(a.end?" to "+fmtT(new Date(a.end)):"");
+    row.querySelector(".p").textContent=[a.loc,a.stn?"near "+a.stn+" MRT":""].filter(Boolean).join(" · ")||"No place given";
+    row.querySelector('[data-a="show"]').onclick=()=>showSg({id:a.id});
+    row.querySelector('[data-a="edit"]').onclick=()=>{aptForm(a);$("a-state").textContent="Editing “"+a.title+"”.";$("a-title").focus();};
+    // Two taps to delete, so a slip of the finger doesn't lose an appointment
+    const del=row.querySelector('[data-a="del"]');
+    del.onclick=()=>{
+      if(del.dataset.armed){APTS=APTS.filter(x=>x.id!==a.id);saveApts();if(editingApt===a.id) aptForm(null);
+        $("a-state").textContent="Deleted “"+a.title+"”.";renderApts();showSg(current&&current.id!==a.id?current:null);return;}
+      del.dataset.armed="1";del.textContent="Tap again to delete";
+      setTimeout(()=>{if(del.isConnected){delete del.dataset.armed;del.textContent="Delete";}},4000);};
+    box.append(row);});
+}
+$("aptform").onsubmit=ev=>{
+  ev.preventDefault();
+  const title=$("a-title").value.trim(), date=$("a-date").value, st=$("a-start").value, en=$("a-end").value, url=$("a-url").value.trim();
+  const fail=(msg,id)=>{$("a-state").innerHTML='<span class="err"></span>';$("a-state").firstChild.textContent=msg;$(id).focus();};
+  if(!title) return fail("Add a name for the appointment.","a-title");
+  if(!date) return fail("Choose a date.","a-date");
+  if(!st) return fail("Choose a start time.","a-start");
+  const start=sgDate(date,st), end=en?sgDate(date,en):null;
+  if(end&&end<=start) return fail("The end time must be after the start time.","a-end");
+  if(url&&!safeUrl(url)) return fail("The link must start with http:// or https://.","a-url");
+  const a={id:editingApt||"apt-"+Date.now().toString(36),title,start:start.toISOString(),end:end?end.toISOString():null,
+    loc:$("a-loc").value.trim(),stn:$("a-stn").value,url:url?safeUrl(url):""};
+  const isEdit=!!editingApt;
+  APTS=APTS.filter(x=>x.id!==a.id).concat(a);
+  const ok=saveApts();
+  aptForm(null);renderApts();showSg({id:a.id});
+  $("a-state").textContent=(isEdit?"Updated “":"Saved “")+a.title+"”. "+(ok?"It's on the calendar and saved on this phone.":"It's on the calendar, but this phone wouldn't let the app save it, so it will be gone next time.");
+};
+$("a-cancel").onclick=()=>{aptForm(null);$("a-state").textContent="";};
 $("calprev").onclick=()=>{view=view.m?{y:view.y,m:view.m-1}:{y:view.y-1,m:11};renderCal();};
 $("calnext").onclick=()=>{view=view.m<11?{y:view.y,m:view.m+1}:{y:view.y+1,m:0};renderCal();};
 $("calnextev").onclick=()=>{const e=nextEvent();if(!e) return;current=e;goToDay(dayKey(e.start));showEvent();};
@@ -635,7 +713,7 @@ function sgMeta(){
   ". The app's server fetches a new list every 3 hours.";}
 // Rebuilds the calendar: Luma Singapore events (with any registered addresses) plus the user's own events
 function showSg(keep){
-  loadEvents(applyReg(SG_EVENTS).concat(extraEvents));
+  loadEvents(applyReg(SG_EVENTS).concat(extraEvents,aptEvents()));
   const e=keep&&events.find(x=>sameEvent(x,keep));
   if(e){current=e;goToDay(dayKey(e.start));showEvent();}
   sgMeta();
@@ -656,6 +734,7 @@ async function refreshEvents(manual){
   }finally{btn.disabled=false;$("sgloadtxt").textContent="Refresh events";}
 }
 $("sgload").onclick=()=>refreshEvents(true);
+renderApts();
 showSg(null);
 refreshEvents(false);
 </script>
