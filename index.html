@@ -91,14 +91,15 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .links a{color:var(--accent);font-weight:600;font-size:14px}
 details{border-top:1px solid var(--line);padding-top:12px}
 summary{cursor:pointer;font-weight:700}
-.plan{margin-top:28px}
-.plan .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
-.plan p,.plan li{max-width:68ch}
-.plan ul,.plan ol{padding-left:20px;margin:6px 0}
-table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
-th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.tbl{overflow-x:auto}
 code{font-family:var(--mono);font-size:13px}
+.install{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:20px;display:flex;flex-direction:column;gap:8px}
+.install h2{color:var(--fg);font-size:13px}
+.install ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;max-width:60ch}
+.install .acts{display:flex;flex-wrap:wrap;gap:8px}
+.install .ico{vertical-align:-4px;width:17px;height:17px}
+.update{position:fixed;left:0;right:0;bottom:0;z-index:10;display:flex;justify-content:center;padding:0 16px calc(16px + env(safe-area-inset-bottom,0px))}
+.update div{background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 12px 10px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:12px;box-shadow:0 6px 24px rgba(0,0,0,.25);max-width:520px}
+.update button{font:inherit;font-weight:700;border:0;border-radius:999px;padding:7px 14px;background:var(--accent);color:var(--onaccent);cursor:pointer}
 @media (prefers-reduced-motion:no-preference){.strip li{animation:in .3s ease both}@keyframes in{from{transform:translateY(4px);opacity:.4}}}
 </style>
 </head>
@@ -112,6 +113,33 @@ code{font-family:var(--mono);font-size:13px}
   </div>
   <span class="tag">Prototype</span>
 </header>
+
+<section class="install" id="install" aria-labelledby="install-h" hidden>
+  <h2 id="install-h">Install the app on your phone</h2>
+  <div id="install-ios" hidden>
+    <ol>
+      <li>Open this page in <strong>Safari</strong>.</li>
+      <li>Tap the <strong>Share</strong> button <svg class="ico" viewBox="0 0 24 24" role="img" aria-label="Share icon"><path d="M12 15V3M8 7l4-4 4 4M6 11H5v10h14V11h-1"/></svg> in the toolbar.</li>
+      <li>Scroll down and tap <strong>Add to Home Screen</strong>, then tap <strong>Add</strong>.</li>
+    </ol>
+  </div>
+  <div id="install-android" hidden>
+    <ol>
+      <li>Open this page in <strong>Chrome</strong>.</li>
+      <li>Tap the menu <strong>⋮</strong> at the top right.</li>
+      <li>Tap <strong>Install app</strong> (or <strong>Add to Home screen</strong>), then <strong>Install</strong>.</li>
+    </ol>
+  </div>
+  <p class="hint">It opens full screen from your home screen and works without a connection.</p>
+  <div class="acts">
+    <button type="button" class="btn primary" id="install-btn" hidden>Install app</button>
+    <button type="button" class="btn" id="install-close">Got it</button>
+  </div>
+</section>
+
+<div class="update" id="update" role="status" hidden>
+  <div><span>A new version of the app is available.</span><button type="button" id="update-btn">Refresh</button></div>
+</div>
 
 <div class="grid">
 <section class="panel" aria-labelledby="ev-h">
@@ -143,7 +171,7 @@ code{font-family:var(--mono);font-size:13px}
   <div data-pane="url" hidden>
     <label for="evurl">Luma event link</label>
     <input id="evurl" type="url" placeholder="https://luma.com/abc123">
-    <p class="note" style="margin-top:8px">This preview can't fetch Luma pages: the browser sandbox blocks it. The full app reads the public event page on its server. For now the link is kept for the map buttons, and you fill in the venue under "Type it in".</p>
+    <p class="note" style="margin-top:8px">The app can't read Luma event pages directly. The link is kept for the map buttons; fill in the event details under "Type it in".</p>
   </div>
   <div data-pane="man" hidden>
     <div style="display:flex;flex-direction:column;gap:10px">
@@ -182,7 +210,6 @@ code{font-family:var(--mono);font-size:13px}
     <div><label for="to">Station nearest the venue</label><select id="to"></select></div>
   </div>
   <p class="hint" id="tohint"></p>
-  <p class="hint">Using your phone's location to find the nearest station is a planned option and will only run after you allow it. This preview asks for your station instead.</p>
 </section>
 
 <section class="panel" aria-labelledby="rt-h" aria-live="polite">
@@ -191,44 +218,6 @@ code{font-family:var(--mono);font-size:13px}
 </section>
 </div>
 
-<section class="panel plan" aria-labelledby="plan-h">
-  <h2 id="plan-h">Build plan</h2>
-  <div class="cols">
-    <div>
-      <h3 style="font-size:17px">Where event data can come from</h3>
-      <div class="tbl"><table>
-        <tr><th>Source</th><th>Works for</th><th>Notes</th></tr>
-        <tr><td>Luma city page (luma.com/discover/singapore)</td><td>Public events in Singapore</td><td>No login. The page loads its list from Luma's public discover feed, which includes each event's map coordinates. Refresh on the server a few times a day; respect Luma's terms. Venues of some events are hidden until you register, so only the area is known.</td></tr>
-        <tr><td>Luma iCal subscription</td><td>Events you registered for</td><td>Best fit for "my next event". The feed URL is private to you: store it encrypted on the server and never log it.</td></tr>
-        <tr><td>Event link</td><td>Any public event</td><td>Server fetches the public page and reads title, start time and venue from its metadata. Check Luma's terms; cache results and rate-limit.</td></tr>
-        <tr><td>.ics file / manual entry</td><td>Anything</td><td>No account access needed. What this preview uses.</td></tr>
-        <tr><td>Luma API</td><td>Hosts only</td><td>Needs Luma Plus and a key scoped to a calendar you manage. It doesn't list events you're attending elsewhere.</td></tr>
-      </table></div>
-    </div>
-    <div>
-      <h3 style="font-size:17px">App flow</h3>
-      <ol>
-        <li>Pick a source: Luma's Singapore events list (default), your Luma iCal feed, an event link, or a file.</li>
-        <li>Show the events on a month calendar. Tapping a date lists that day's events, and the user picks one. The next upcoming event is selected to start.</li>
-        <li>Find the nearest stations from the event's coordinates (or geocode the address with OneMap), then the closest exit.</li>
-        <li>Ask for a starting station, or with consent use device location to suggest one.</li>
-        <li>Route on the MRT graph: lines, direction, interchanges, alighting stop, time.</li>
-        <li>Walking leg from the best exit (OneMap walk routing), plus Google Maps and OneMap links.</li>
-        <li>Show "leave by" time from the event start, with a reminder option.</li>
-      </ol>
-    </div>
-    <div>
-      <h3 style="font-size:17px">Stack and data</h3>
-      <ul>
-        <li>Next.js or similar with a small server for feed fetching and page parsing (no CORS issues, secrets stay server side).</li>
-        <li>Station and exit coordinates: LTA datasets on data.gov.sg / LTA DataMall. Refresh when lines open.</li>
-        <li>Routing: own graph for MRT legs; OneMap routing API (free account token) or Google Directions transit for walking and door-to-door checks.</li>
-        <li>Train disruptions: LTA DataMall train service alerts, shown above the route.</li>
-      </ul>
-      <p class="hint">Preview limits: station list is hand-entered and covers the six MRT lines (no LRT, no Circle Line Stage 6). Timings are estimates (about 2.3 min per stop, 5 min per transfer). Always check the live map links.</p>
-    </div>
-  </div>
-</section>
 </div>
 
 <script>
@@ -465,7 +454,52 @@ showSg(null);
 refreshEvents(false);
 </script>
 <script>
-if("serviceWorker" in navigator) addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+// ---------- install instructions (phones only, until installed or dismissed) ----------
+(function(){
+  const box=document.getElementById("install"), btn=document.getElementById("install-btn");
+  const store={get:k=>{try{return localStorage.getItem(k)}catch(_){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(_){}}};
+  const installed=()=>matchMedia("(display-mode: standalone)").matches||navigator.standalone===true||store.get("lm-installed")==="1";
+  const ua=navigator.userAgent;
+  const ios=/iPhone|iPad|iPod/.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+  const android=/Android/.test(ua);
+  let deferred=null;
+  const hide=()=>{box.hidden=true;};
+  function show(){
+    if(installed()||store.get("lm-install-dismissed")==="1"||!(ios||android)) return;
+    document.getElementById("install-ios").hidden=!ios;
+    document.getElementById("install-android").hidden=!android;
+    box.hidden=false;
+  }
+  // Chrome on Android offers a one-tap install prompt
+  addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;btn.hidden=false;show();});
+  btn.onclick=async()=>{if(!deferred) return;deferred.prompt();const c=await deferred.userChoice;deferred=null;btn.hidden=true;if(c.outcome==="accepted"){store.set("lm-installed","1");hide();}};
+  addEventListener("appinstalled",()=>{store.set("lm-installed","1");hide();});
+  document.getElementById("install-close").onclick=()=>{store.set("lm-install-dismissed","1");hide();};
+  // Opening from the home screen counts as installed, so the message never returns
+  if(matchMedia("(display-mode: standalone)").matches||navigator.standalone===true) store.set("lm-installed","1");
+  show();
+})();
+
+// ---------- service worker + "new version" prompt ----------
+if("serviceWorker" in navigator){
+  let updating=false;
+  const bar=document.getElementById("update");
+  navigator.serviceWorker.addEventListener("controllerchange",()=>{if(updating) location.reload();});
+  addEventListener("load",async()=>{
+    let reg;try{reg=await navigator.serviceWorker.register("sw.js");}catch(_){return;}
+    // Only offer an update when an older version is already running this page
+    const offer=w=>{if(!w||!navigator.serviceWorker.controller) return;
+      bar.hidden=false;
+      document.getElementById("update-btn").onclick=()=>{updating=true;w.postMessage("skipWaiting");};};
+    if(reg.waiting) offer(reg.waiting);
+    reg.addEventListener("updatefound",()=>{const w=reg.installing;if(!w) return;
+      w.addEventListener("statechange",()=>{if(w.state==="installed") offer(w);});});
+    // Look for a new version when the app comes back to the screen, and every 30 minutes
+    const check=()=>reg.update().catch(()=>{});
+    document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible") check();});
+    setInterval(check,30*60e3);
+  });
+}
 </script>
 </body>
 </html>

@@ -40,7 +40,11 @@ GitHub pauses scheduled workflows in public repositories after 60 days without c
 
 ## Updating the app
 
-After any change to `index.html`, bump `VERSION` in `sw.js` so installed copies pick up the new version.
+Push to `main`. The workflow stamps `sw.js` with the commit id, so every push is a new version. Open copies of the app check for a new version when they come back on screen and every 30 minutes, then show "A new version of the app is available" with a **Refresh** button. Scheduled event refreshes don't change the version, so they don't trigger this message.
+
+## Install message
+
+On a phone browser, the app shows install steps for iPhone (Safari → Share → Add to Home Screen) or Android (Chrome → ⋮ → Install app, or a one-tap **Install app** button when Chrome offers it). The message is hidden once the app is installed or opened from the home screen, or after **Got it**.
 
 ## Data sources
 

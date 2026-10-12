@@ -1,7 +1,9 @@
-// Bump VERSION whenever index.html changes so phones pick up the new copy
-const VERSION="luma-mrt-v2";
+// The deploy workflow replaces __BUILD__ with the commit id, so every push is a new version
+const VERSION="luma-mrt-__BUILD__";
 const SHELL=["./","index.html","manifest.webmanifest","icons/icon-192.png","icons/icon-512.png","icons/apple-touch-icon.png"];
-self.addEventListener("install",e=>{e.waitUntil(caches.open(VERSION).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()));});
+// A new version waits until the user taps Refresh in the app (see "skipWaiting" message below)
+self.addEventListener("install",e=>{e.waitUntil(caches.open(VERSION).then(c=>c.addAll(SHELL.map(u=>new Request(u,{cache:"reload"})))));});
+self.addEventListener("message",e=>{if(e.data==="skipWaiting") self.skipWaiting();});
 self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==VERSION).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
 // Network first, saving a copy for offline use
 function networkFirst(req,key){
