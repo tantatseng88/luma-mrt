@@ -10,6 +10,16 @@ function networkFirst(req,key){
   return fetch(req).then(r=>{if(r.ok){const c=r.clone();caches.open(VERSION).then(x=>x.put(key||req,c));}return r;})
     .catch(()=>caches.match(key||req).then(hit=>hit||Response.error()));
 }
+// Tapping an appointment alert: bring the app forward on that appointment, or open it if it's closed
+self.addEventListener("notificationclick",e=>{
+  e.notification.close();
+  const d=e.notification.data||{}, url=new URL(d.url||"./",self.registration.scope).href;
+  e.waitUntil(self.clients.matchAll({type:"window",includeUncontrolled:true}).then(cs=>{
+    const c=cs.find(x=>x.url.startsWith(self.registration.scope));
+    if(c){if(d.id) c.postMessage({type:"open-apt",id:d.id});return c.focus();}
+    return self.clients.openWindow(url);
+  }));
+});
 self.addEventListener("fetch",e=>{
   const req=e.request,url=new URL(req.url);
   if(req.method!=="GET") return;

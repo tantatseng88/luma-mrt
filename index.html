@@ -82,6 +82,12 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .apt-row .acts{display:flex;flex-wrap:wrap;gap:14px;margin-top:2px}
 .tag.apt{color:var(--food);border-color:var(--food)}
 .err{color:var(--ns)}
+.custom{display:flex;gap:6px}.custom input{width:5.5em;flex:none}
+.alertbox{margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:8px;font-size:14px}
+.remind{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
+.remind-item{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:12px 14px;border-radius:8px;border:1px solid var(--food);border-left-width:6px;background:var(--panel)}
+.remind-item .txt{flex:1 1 220px;min-width:0}
+.remind-item strong{display:block;font-size:16px}
 .daybar{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
 .evlist{display:flex;flex-direction:column;gap:10px}
 .evitem{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:14px 16px;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
@@ -188,6 +194,7 @@ code{font-family:var(--mono);font-size:13px}
 </div>
 
 <div id="page-trip" role="tabpanel" aria-labelledby="pt-trip">
+<div class="remind" id="remind" role="status" aria-live="polite" hidden></div>
 <div class="grid">
 <div class="stack">
 <section class="panel sec-event" aria-labelledby="ev-h">
@@ -235,6 +242,26 @@ code{font-family:var(--mono);font-size:13px}
       <div><label for="a-loc">Place or address <span class="opt">(optional)</span></label><input id="a-loc" placeholder="e.g. Jewel Changi Airport" autocomplete="off"></div>
       <div><label for="a-stn">Station nearest the place</label><select id="a-stn"></select></div>
       <div><label for="a-url">Link <span class="opt">(optional)</span></label><input id="a-url" type="url" placeholder="https://" autocomplete="off"></div>
+      <div class="row">
+        <div><label for="a-alert">Alert</label>
+          <select id="a-alert">
+            <option value="">No alert</option>
+            <option value="0">At the start time</option>
+            <option value="5">5 minutes before</option>
+            <option value="10">10 minutes before</option>
+            <option value="15">15 minutes before</option>
+            <option value="30">30 minutes before</option>
+            <option value="60">1 hour before</option>
+            <option value="120">2 hours before</option>
+            <option value="1440">1 day before</option>
+            <option value="leave">When it's time to leave</option>
+            <option value="custom">Custom…</option>
+          </select></div>
+        <div id="a-custom" hidden><label for="a-cnum">Custom alert</label>
+          <div class="custom"><input id="a-cnum" type="number" min="1" max="999" inputmode="numeric" placeholder="e.g. 45">
+            <select id="a-cunit" aria-label="Unit"><option value="1">minutes before</option><option value="60">hours before</option><option value="1440">days before</option></select></div></div>
+      </div>
+      <p class="hint" id="a-alerthint" style="margin:0" hidden></p>
       <p class="hint" style="margin:0">Times are Singapore time.</p>
       <div class="triprow">
         <button type="submit" class="btn primary" id="a-save">Save appointment</button>
@@ -242,6 +269,13 @@ code{font-family:var(--mono);font-size:13px}
       </div>
       <p class="hint" id="a-state" aria-live="polite" style="margin:0"></p>
     </form>
+    <div class="alertbox" id="alertbox">
+      <div><strong>Alerts</strong> <span id="alertstatus"></span></div>
+      <div class="triprow">
+        <button type="button" class="btn" id="alerton" hidden>Turn on alerts</button>
+        <button type="button" class="btn" id="alerttest" hidden>Send a test alert</button>
+      </div>
+    </div>
     <h2 style="margin:16px 0 8px">Saved appointments</h2>
     <div id="aptlist" class="aptlist"></div>
   </div>
@@ -640,12 +674,160 @@ function importICS(text){
 function readFile(f){const rd=new FileReader();rd.onload=()=>importICS(String(rd.result));rd.readAsText(f);}
 $("icsfile").onchange=e=>{const f=e.target.files[0];if(f) readFile(f);e.target.value="";};
 $("icsparse").onclick=()=>importICS($("icstext").value);
+// ---------- Alerts for My appointments ----------
+// alert is null, {mins:N} (N minutes before the start) or {leave:true} (start minus travel time from the saved Starting Station)
+const PRESET_MINS=["0","5","10","15","30","60","120","1440"];
+function alertLabel(al){
+  if(!al) return "";
+  if(al.leave) return "When it's time to leave";
+  const m=al.mins;
+  if(m===0) return "At the start time";
+  if(m%1440===0) return m/1440+" day"+(m===1440?"":"s")+" before";
+  if(m%60===0) return m/60+" hour"+(m===60?"":"s")+" before";
+  return m+" minute"+(m===1?"":"s")+" before";
+}
+// Minutes from the saved Starting Station to the appointment: trains + 10 min walk + 5 min buffer
+function travelMins(a){
+  const from=savedFrom(), stn=a.stn||guessStation(a.loc);
+  if(!stn||!byStation.has(stn)) return null;
+  const r=route(from,stn);
+  return (r?r.mins:0)+10+5;
+}
+function alertTime(a){
+  if(!a.alert) return null;
+  const s=new Date(a.start).getTime();
+  if(a.alert.leave){const t=travelMins(a);return new Date(s-(t==null?60:t)*60e3);}
+  return new Date(s-a.alert.mins*60e3);
+}
+const FIRED_KEY="lm-alerts-fired";
+let FIRED=(()=>{try{return JSON.parse(localStorage.getItem(FIRED_KEY)||"{}")||{};}catch(_){return {};}})();
+const saveFired=()=>{try{localStorage.setItem(FIRED_KEY,JSON.stringify(FIRED));}catch(_){}};
+// The key includes the alert time, so editing an appointment's time or alert lets it alert again
+const firedKey=a=>a.id+"@"+alertTime(a).getTime();
+let alertTimers=[];
+function scheduleAlerts(){
+  alertTimers.forEach(clearTimeout);alertTimers=[];
+  const now=Date.now(), live=new Set();
+  for(const a of APTS){
+    const t=alertTime(a);if(!t) continue;
+    const k=firedKey(a);live.add(k);
+    if(FIRED[k]) continue;
+    const start=new Date(a.start).getTime();
+    // Missed while the app was closed: still worth showing until an hour after the start
+    if(t.getTime()<=now){if(now<start+3600e3) fireAlert(a,true);else{FIRED[k]=now;}}
+    // Browsers only keep timers reliably for a while, so schedule the next 24 hours and recheck regularly
+    else if(t.getTime()-now<864e5) alertTimers.push(setTimeout(()=>fireAlert(a,false),t.getTime()-now));
+  }
+  for(const k of Object.keys(FIRED)) if(!live.has(k)) delete FIRED[k];
+  saveFired();
+}
+async function fireAlert(a,late){
+  const k=firedKey(a);if(FIRED[k]) return;
+  FIRED[k]=Date.now();saveFired();
+  const s=new Date(a.start), stn=a.stn||guessStation(a.loc);
+  const body=(a.alert.leave?"Time to leave"+(stn?" for "+stn:"")+". ":"")+"Starts "+fmtT(s)+(a.loc?" at "+a.loc:"")+".";
+  showReminder(a,body,late);
+  if(notifyState()==="granted"){
+    try{
+      const reg=navigator.serviceWorker&&await navigator.serviceWorker.getRegistration();
+      const opts={body,tag:a.id,icon:"icons/icon-192.png",badge:"icons/icon-192.png",data:{id:a.id,url:"./#"+a.id}};
+      if(reg) await reg.showNotification(a.title,opts); else new Notification(a.title,opts);
+    }catch(_){}
+  }
+}
+// In-app reminder banner at the top of Plan a trip
+function showReminder(a,body,late){
+  const box=$("remind"), item=document.createElement("div");
+  item.className="remind-item";
+  item.innerHTML='<div class="txt"><strong></strong><span class="small"></span></div>'+
+    '<button type="button" class="btn primary" data-r="route">Show route</button><button type="button" class="btn" data-r="close">Dismiss</button>';
+  item.querySelector("strong").textContent="Reminder: "+a.title;
+  item.querySelector(".small").textContent=(late?"Alert was due "+fmtT(alertTime(a))+". ":"")+body;
+  const close=()=>{item.remove();box.hidden=!box.children.length;};
+  item.querySelector('[data-r="route"]').onclick=()=>{goPage("trip");showSg({id:a.id});close();document.querySelector(".sec-route").scrollIntoView({behavior:"smooth",block:"start"});};
+  item.querySelector('[data-r="close"]').onclick=close;
+  box.prepend(item);box.hidden=false;
+}
+// Notification permission: "granted", "denied", "default" or "unsupported"
+const notifyState=()=>("Notification" in window)?Notification.permission:"unsupported";
+const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+function alertStatus(){
+  const st=notifyState(), s=$("alertstatus");
+  $("alerton").hidden=st!=="default";$("alerttest").hidden=st!=="granted";
+  s.textContent=st==="granted"?"On. Alerts pop up while the app is open or recently in the background. Ones missed while it was closed show when you open it. For alerts that always arrive, use Add to phone calendar on an appointment."
+    :st==="denied"?"Blocked for this app in your browser or phone settings. Reminders still show inside the app, or use Add to phone calendar."
+    :st==="default"?"Off. Turn them on to get a phone notification at each appointment's alert time."
+    :isIOS?"On iPhone, notifications need the app on your Home Screen (iOS 16.4 or later). Reminders still show inside the app, or use Add to phone calendar."
+    :"This browser can't show notifications. Reminders still show inside the app, or use Add to phone calendar.";
+}
+async function askNotify(){
+  if(notifyState()!=="default") return;
+  try{await Notification.requestPermission();}catch(_){}
+  alertStatus();
+}
+$("alerton").onclick=askNotify;
+$("alerttest").onclick=async()=>{
+  try{const reg=navigator.serviceWorker&&await navigator.serviceWorker.getRegistration();
+    const opts={body:"Alerts are working on this phone.",tag:"test",icon:"icons/icon-192.png"};
+    if(reg) await reg.showNotification("Luma to MRT",opts); else new Notification("Luma to MRT",opts);
+    $("alertstatus").textContent="Test alert sent. If nothing appeared, check this app's notification settings on your phone.";
+  }catch(_){$("alertstatus").textContent="This phone didn't show the test alert. Check this app's notification settings.";}
+};
+// A notification tapped while the app is open: jump to that appointment's route
+if("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message",ev=>{
+  if(ev.data&&ev.data.type==="open-apt"){goPage("trip");showSg({id:ev.data.id});}});
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible") scheduleAlerts();});
+setInterval(scheduleAlerts,15*60e3);
+
+// Add to phone calendar: a calendar file with the same alert, so the phone's calendar app alerts even when this app is closed
+function icsFor(a){
+  const z=d=>d.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,"");
+  const tx=s=>String(s).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\r?\n/g,"\\n");
+  const start=new Date(a.start), end=a.end?new Date(a.end):new Date(start.getTime()+3600e3), t=alertTime(a), stn=a.stn||guessStation(a.loc);
+  const L=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Luma to MRT//EN","CALSCALE:GREGORIAN","BEGIN:VEVENT",
+    "UID:"+a.id+"@luma-mrt","DTSTAMP:"+z(new Date()),"DTSTART:"+z(start),"DTEND:"+z(end),"SUMMARY:"+tx(a.title)];
+  if(a.loc) L.push("LOCATION:"+tx(a.loc));
+  if(stn) L.push("DESCRIPTION:"+tx("Nearest MRT: "+stn+(a.alert&&a.alert.leave?". Alert set for when to leave from "+savedFrom()+".":"")));
+  if(a.url) L.push("URL:"+a.url);
+  if(t) L.push("BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+tx(a.title),"TRIGGER:-PT"+Math.max(0,Math.round((start-t)/60e3))+"M","END:VALARM");
+  L.push("END:VEVENT","END:VCALENDAR");
+  return L.join("\r\n")+"\r\n";
+}
+function downloadIcs(a){
+  const blob=new Blob([icsFor(a)],{type:"text/calendar"}), u=URL.createObjectURL(blob), link=document.createElement("a");
+  link.href=u;link.download=(a.title.replace(/[^\w -]+/g,"").trim().replace(/\s+/g,"-")||"appointment")+".ics";
+  document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(u),10000);
+  $("a-state").textContent="Calendar file for “"+a.title+"” created. Open it to add it to your phone's calendar"+(a.alert?" with the alert":"")+".";
+}
+
 // ---------- My appointments: non-Luma events, saved on this phone ----------
+function setAlertField(al){
+  let v="";
+  if(al&&al.leave) v="leave";
+  else if(al&&PRESET_MINS.includes(String(al.mins))) v=String(al.mins);
+  else if(al){v="custom";const m=al.mins,u=m%1440===0?1440:m%60===0?60:1;$("a-cunit").value=String(u);$("a-cnum").value=String(m/u);}
+  $("a-alert").value=v;alertFieldChanged();
+}
+function alertFieldChanged(){
+  const v=$("a-alert").value, h=$("a-alerthint");
+  $("a-custom").hidden=v!=="custom";
+  h.hidden=v!=="leave";
+  if(v==="leave") h.textContent="Worked out from your saved Starting Station ("+savedFrom()+"): train time, a 10-minute walk and a 5-minute buffer. Choose the station nearest the place for this to work.";
+}
+$("a-alert").onchange=alertFieldChanged;
+function readAlertField(){
+  const v=$("a-alert").value;
+  if(!v) return {ok:true,al:null};
+  if(v==="leave") return {ok:true,al:{leave:true}};
+  if(v==="custom"){const n=parseInt($("a-cnum").value,10);if(!(n>=1&&n<=999)) return {ok:false};return {ok:true,al:{mins:n*parseInt($("a-cunit").value,10)}};}
+  return {ok:true,al:{mins:parseInt(v,10)}};
+}
 function aptForm(a){
   const p=a?sgParts(new Date(a.start)):null;
   $("a-title").value=a?a.title:"";$("a-date").value=p?p.date:"";$("a-start").value=p?p.time:"";
   $("a-end").value=a&&a.end?sgParts(new Date(a.end)).time:"";$("a-loc").value=a?a.loc||"":"";
-  $("a-stn").value=a?a.stn||"":"";$("a-url").value=a?a.url||"":"";
+  $("a-stn").value=a?a.stn||"":"";$("a-url").value=a?a.url||"":"";$("a-cnum").value="";$("a-cunit").value="1";
+  setAlertField(a?a.alert||null:null);
   editingApt=a?a.id:null;$("a-save").textContent=a?"Save changes":"Save appointment";$("a-cancel").hidden=!a;
 }
 function renderApts(){
@@ -656,19 +838,23 @@ function renderApts(){
   list.forEach(a=>{
     const s=new Date(a.start), row=document.createElement("div");
     row.className="apt-row"+(new Date(a.end||a.start).getTime()<now?" past":"");
-    row.innerHTML='<strong></strong><span class="small t"></span><span class="small p"></span><div class="acts">'+
+    row.innerHTML='<strong></strong><span class="small t"></span><span class="small p"></span><span class="small al"></span><div class="acts">'+
       '<button type="button" class="linkbtn" data-a="show">Show on calendar</button><button type="button" class="linkbtn" data-a="edit">Edit</button>'+
+      '<button type="button" class="linkbtn" data-a="ics">Add to phone calendar</button>'+
       '<button type="button" class="linkbtn err" data-a="del">Delete</button></div>';
     row.querySelector("strong").textContent=a.title;
     row.querySelector(".t").textContent=fmt(s)+(a.end?" to "+fmtT(new Date(a.end)):"");
     row.querySelector(".p").textContent=[a.loc,a.stn?"near "+a.stn+" MRT":""].filter(Boolean).join(" · ")||"No place given";
+    const t=alertTime(a);
+    row.querySelector(".al").textContent=a.alert?"Alert: "+alertLabel(a.alert)+" ("+fmtT(t)+(dayKey(t)!==dayKey(s)?", "+t.toLocaleDateString("en-GB",{timeZone:"Asia/Singapore",day:"numeric",month:"short"}):"")+")":"No alert";
     row.querySelector('[data-a="show"]').onclick=()=>showSg({id:a.id});
     row.querySelector('[data-a="edit"]').onclick=()=>{aptForm(a);$("a-state").textContent="Editing “"+a.title+"”.";$("a-title").focus();};
+    row.querySelector('[data-a="ics"]').onclick=()=>downloadIcs(a);
     // Two taps to delete, so a slip of the finger doesn't lose an appointment
     const del=row.querySelector('[data-a="del"]');
     del.onclick=()=>{
       if(del.dataset.armed){APTS=APTS.filter(x=>x.id!==a.id);saveApts();if(editingApt===a.id) aptForm(null);
-        $("a-state").textContent="Deleted “"+a.title+"”.";renderApts();showSg(current&&current.id!==a.id?current:null);return;}
+        $("a-state").textContent="Deleted “"+a.title+"”.";renderApts();scheduleAlerts();showSg(current&&current.id!==a.id?current:null);return;}
       del.dataset.armed="1";del.textContent="Tap again to delete";
       setTimeout(()=>{if(del.isConnected){delete del.dataset.armed;del.textContent="Delete";}},4000);};
     box.append(row);});
@@ -683,13 +869,24 @@ $("aptform").onsubmit=ev=>{
   const start=sgDate(date,st), end=en?sgDate(date,en):null;
   if(end&&end<=start) return fail("The end time must be after the start time.","a-end");
   if(url&&!safeUrl(url)) return fail("The link must start with http:// or https://.","a-url");
+  const alr=readAlertField();
+  if(!alr.ok) return fail("Enter a custom alert between 1 and 999.","a-cnum");
   const a={id:editingApt||"apt-"+Date.now().toString(36),title,start:start.toISOString(),end:end?end.toISOString():null,
-    loc:$("a-loc").value.trim(),stn:$("a-stn").value,url:url?safeUrl(url):""};
+    loc:$("a-loc").value.trim(),stn:$("a-stn").value,url:url?safeUrl(url):"",alert:alr.al};
   const isEdit=!!editingApt;
   APTS=APTS.filter(x=>x.id!==a.id).concat(a);
   const ok=saveApts();
-  aptForm(null);renderApts();showSg({id:a.id});
-  $("a-state").textContent=(isEdit?"Updated “":"Saved “")+a.title+"”. "+(ok?"It's on the calendar and saved on this phone.":"It's on the calendar, but this phone wouldn't let the app save it, so it will be gone next time.");
+  aptForm(null);renderApts();scheduleAlerts();showSg({id:a.id});
+  let msg=(isEdit?"Updated “":"Saved “")+a.title+"”. "+(ok?"It's on the calendar and saved on this phone.":"It's on the calendar, but this phone wouldn't let the app save it, so it will be gone next time.");
+  if(a.alert){
+    const t=alertTime(a);
+    msg+=" Alert at "+fmtT(t)+(dayKey(t)!==dayKey(start)?" on "+t.toLocaleDateString("en-GB",{timeZone:"Asia/Singapore",day:"numeric",month:"short"}):"")+".";
+    if(a.alert.leave&&travelMins(a)==null) msg+=" No station for this place, so the alert is 1 hour before.";
+    if(t.getTime()<Date.now()) msg+=" That time has already passed.";
+  }
+  $("a-state").textContent=msg;
+  // Saving with an alert is a good moment to ask for notification permission
+  if(a.alert) askNotify();
 };
 $("a-cancel").onclick=()=>{aptForm(null);$("a-state").textContent="";};
 $("calprev").onclick=()=>{view=view.m?{y:view.y,m:view.m-1}:{y:view.y-1,m:11};renderCal();};
@@ -736,6 +933,10 @@ async function refreshEvents(manual){
 $("sgload").onclick=()=>refreshEvents(true);
 renderApts();
 showSg(null);
+alertStatus();
+scheduleAlerts();
+// Opened from a notification: show that appointment
+if(/^#apt-/.test(location.hash)) showSg({id:location.hash.slice(1)});
 refreshEvents(false);
 </script>
 <script>
