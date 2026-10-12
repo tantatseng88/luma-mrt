@@ -351,7 +351,7 @@ function renderDay(){
     if(url){b.href=url;b.target="_blank";b.rel="noopener";b.setAttribute("aria-current",e===current);}
     else{b.type="button";b.setAttribute("aria-pressed",e===current);}
     b.innerHTML=(url?'<span class="ext">Luma ↗</span>':'')+'<span class="t"></span> <strong></strong><br><span class="small"></span>';
-    b.querySelector(".t").textContent=fmtT(e.start);b.querySelector("strong").textContent=e.title||"Untitled";b.querySelector(".small").textContent=e.loc||"No venue listed";
+    b.querySelector(".t").textContent=fmtT(e.start);b.querySelector("strong").textContent=e.title||"Untitled";b.querySelector(".small").textContent=e.loc||(e.approx?"Address shown on Luma after you register":"No venue listed");
     if(url) b.setAttribute("aria-label",(e.title||"Untitled")+", "+fmtT(e.start)+". Opens on Luma in a new tab");
     b.onclick=()=>{current=e;renderDay();showEvent();};box.append(b);});
 }
