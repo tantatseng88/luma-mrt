@@ -31,6 +31,10 @@
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5;padding:0 16px}
 .wrap{max-width:1080px;margin:0 auto;padding-block:28px 56px}
+.closebtn{align-self:flex-start}
+.closenote{margin:-10px 0 20px}
+.foot{margin-top:28px;padding-top:14px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.foot p{margin:0;max-width:72ch}
 header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;border-bottom:3px solid var(--fg);padding-bottom:12px;margin-bottom:22px}
 h1{font-family:var(--display);font-weight:800;font-size:clamp(26px,4vw,36px);margin:0;letter-spacing:-.01em;text-wrap:balance}
 .stripes{display:flex;gap:4px}.stripes i{width:22px;height:8px;border-radius:2px;display:block}
@@ -159,7 +163,11 @@ code{font-family:var(--mono);font-size:13px}
     <h1>Luma to MRT</h1>
     <p class="sub">Load your next Luma event, pick the MRT station you're starting from, and get the lines, interchanges and stop to alight at. Nothing leaves this page.</p>
   </div>
+  <button type="button" class="btn closebtn" id="closeapp">
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>Close app
+  </button>
 </header>
+<p class="note closenote" id="closenote" role="status" hidden></p>
 
 <nav class="pagetabs" role="tablist" aria-label="Sections">
   <button type="button" role="tab" id="pt-trip" aria-selected="true" aria-controls="page-trip" data-page="trip">Plan a trip</button>
@@ -372,6 +380,10 @@ code{font-family:var(--mono);font-size:13px}
 </section>
 </div>
 
+<footer class="foot">
+  <p id="upd-line">Checking for a new version…</p>
+  <button type="button" class="linkbtn" id="upd-now" hidden>Check now</button>
+</footer>
 </div>
 
 <script>
@@ -972,7 +984,8 @@ if("serviceWorker" in navigator){
   const bar=document.getElementById("update");
   navigator.serviceWorker.addEventListener("controllerchange",()=>{if(updating) location.reload();});
   addEventListener("load",async()=>{
-    let reg;try{reg=await navigator.serviceWorker.register("sw.js");}catch(_){return;}
+    let reg;try{reg=await navigator.serviceWorker.register("sw.js");}
+    catch(_){document.getElementById("upd-line").textContent="Couldn't start checking for new versions here. Reload the page to get the latest version.";return;}
     // Only offer an update when an older version is already running this page
     const offer=w=>{if(!w||!navigator.serviceWorker.controller) return;
       bar.hidden=false;
@@ -985,12 +998,47 @@ if("serviceWorker" in navigator){
     if(reg.waiting) offer(reg.waiting);
     reg.addEventListener("updatefound",()=>{const w=reg.installing;if(!w) return;
       w.addEventListener("statechange",()=>{if(w.state==="installed") offer(w);});});
-    // Look for a new version when the app comes back to the screen, and every 30 minutes
-    const check=()=>reg.update().catch(()=>{});
+    // Look for a new version when the app opens, when it comes back to the screen, and every 30 minutes;
+    // the footer shows when it last checked and when it will check next
+    const EVERY=30*60e3, line=document.getElementById("upd-line"), now=document.getElementById("upd-now");
+    let timer=null, lastCheck=null, nextCheck=null, checking=false;
+    const showCheck=()=>{
+      const st=checking?"Checking for a new version now…":
+        (reg.waiting||reg.installing)&&navigator.serviceWorker.controller?"A new version is available. Tap Refresh at the bottom of the screen.":
+        lastCheck?"Last checked for a new version: "+fmtSG(lastCheck)+".":"";
+      line.textContent=st+(nextCheck?" Next check: "+fmtSG(nextCheck)+", and whenever you open or return to the app.":"");
+      now.hidden=checking;};
+    const check=async()=>{
+      clearTimeout(timer);checking=true;showCheck();
+      try{await reg.update();}catch(_){}
+      checking=false;lastCheck=new Date();nextCheck=new Date(Date.now()+EVERY);
+      timer=setTimeout(check,EVERY);showCheck();};
+    now.onclick=check;
     document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible") check();});
-    setInterval(check,30*60e3);
+    reg.addEventListener("updatefound",()=>setTimeout(showCheck,1500));
+    check();
   });
+}else{
+  document.getElementById("upd-line").textContent="This browser can't check for new versions automatically. Reload the page to get the latest version.";
 }
+// Singapore date and time format, e.g. 12/10/2026, 3:45 pm
+function fmtSG(d){return d.toLocaleString("en-SG",{timeZone:"Asia/Singapore",day:"2-digit",month:"2-digit",year:"numeric",hour:"numeric",minute:"2-digit"})+" (Singapore time)";}
+
+// ---------- Close app ----------
+// Phones don't let web apps close themselves reliably: try, and if the app is still open, say how to close it
+document.getElementById("closeapp").onclick=()=>{
+  try{window.close();}catch(_){}
+  setTimeout(()=>{
+    const n=document.getElementById("closenote"), ua=navigator.userAgent;
+    const ios=/iPhone|iPad|iPod/.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+    const standalone=matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
+    n.textContent=ios?"iPhone doesn't let apps close themselves. Swipe up from the bottom of the screen to leave the app, or swipe it away in the app switcher to close it."
+      :/Android/.test(ua)?"Your phone didn't let the app close itself. Open Recent apps (the square button, or swipe up and hold) and swipe this app away."
+      :standalone?"Close this app's window with the × at the top of the window."
+      :"Close this browser tab to close the app.";
+    n.hidden=false;clearTimeout(n._t);n._t=setTimeout(()=>{n.hidden=true;},10000);
+  },400);
+};
 </script>
 </body>
 </html>
