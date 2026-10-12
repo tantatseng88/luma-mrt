@@ -68,6 +68,8 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .evlist{display:flex;flex-direction:column;gap:6px}
 .evlist button,.evlist a{display:block;text-align:left;font:inherit;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;cursor:pointer;text-decoration:none}
 .evlist button[aria-pressed="true"],.evlist a[aria-current="true"]{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.steps{margin:0 0 10px;padding-left:20px;display:flex;flex-direction:column;gap:4px;font-size:14px;max-width:62ch}
+.linkbtn{font:inherit;font-weight:600;color:var(--accent);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
 .ext{float:right;margin-left:8px;font-size:12px;font-weight:700;color:var(--accent);white-space:nowrap}
 #ev-title a{color:inherit;text-decoration-color:var(--accent);text-underline-offset:3px}
 #ev-title a span{color:var(--accent);font-size:.8em}
@@ -149,7 +151,7 @@ code{font-family:var(--mono);font-size:13px}
   <h2 id="ev-h">1 · Your event</h2>
   <div class="tabs" role="tablist">
     <button role="tab" id="t-sg" aria-selected="true" data-tab="sg">Luma Singapore</button>
-    <button role="tab" id="t-ics" aria-selected="false" data-tab="ics">Luma calendar file</button>
+    <button role="tab" id="t-ics" aria-selected="false" data-tab="ics">My registration</button>
     <button role="tab" id="t-url" aria-selected="false" data-tab="url">Event link</button>
     <button role="tab" id="t-man" aria-selected="false" data-tab="man">Type it in</button>
   </div>
@@ -165,11 +167,19 @@ code{font-family:var(--mono);font-size:13px}
     <p class="hint" id="sgmeta" style="margin-top:6px"></p>
   </div>
   <div data-pane="ics" hidden>
-    <label for="icsfile">Upload an .ics file from Luma</label>
+    <p style="margin:0 0 6px"><strong>Registered for an event?</strong> Luma hides some addresses from its public list. Add yours here:</p>
+    <ol class="steps">
+      <li>Sign in on luma.com and open the event.</li>
+      <li>Tap <strong>Add to Calendar</strong> and download the calendar (.ics) file. On iPhone, Luma adds the event straight to your calendar instead, so use the calendar invite attached to your Luma registration email (save it to Files).</li>
+      <li>Upload the file here. The address is added to that event and saved on this device only.</li>
+    </ol>
+    <label for="icsfile">Calendar file (.ics)</label>
     <input type="file" id="icsfile" accept=".ics,text/calendar">
-    <p class="hint" style="margin-top:6px">Get it from an event's "Add to Calendar" button, or from the iCal subscription under Luma Settings → Calendar Syncing (that feed lists events you've registered for). You can also paste the file's text:</p>
-    <textarea id="icstext" placeholder="BEGIN:VCALENDAR …"></textarea>
-    <button class="btn" id="icsparse" style="margin-top:6px">Read pasted calendar</button>
+    <p class="hint" id="icsstate" aria-live="polite" style="margin-top:6px"></p>
+    <details style="margin-top:8px"><summary>Paste calendar text instead</summary>
+      <textarea id="icstext" placeholder="BEGIN:VCALENDAR …" style="margin-top:8px"></textarea>
+      <button class="btn" id="icsparse" style="margin-top:6px">Add from pasted text</button>
+    </details>
   </div>
   <div data-pane="url" hidden>
     <label for="evurl">Luma event link</label>
@@ -277,9 +287,22 @@ function route(from,to){
 // ---------- event handling ----------
 const $=id=>document.getElementById(id);
 let events=[], current=null, eventUrl="", view={y:0,m:0}, selDay="";
-const toEvents=list=>list.map(e=>({title:e.t,start:new Date(e.s),url:e.u,ll:e.ll,loc:e.l,approx:!e.l,src:"sg"}));
+const toEvents=list=>list.map(e=>({id:e.i||"",title:e.t,start:new Date(e.s),url:e.u,ll:e.ll,loc:e.l,approx:!e.l,src:"sg"}));
 // Starts with the list built into the page; replaced by events.json, which a GitHub Action updates every 3 hours
 let SG_EVENTS=toEvents(LUMA_SNAPSHOT.events), sgFetched=LUMA_SNAPSHOT.fetched;
+// Events from calendar files or typed in that aren't in the Luma Singapore list
+let extraEvents=[];
+// Addresses from the user's own Luma calendar files, keyed by Luma event id and link; kept on this device only
+const REG_KEY="lm-registered";
+let REG=(()=>{try{return JSON.parse(localStorage.getItem(REG_KEY)||"{}")||{};}catch(_){return {};}})();
+const saveReg=()=>{try{localStorage.setItem(REG_KEY,JSON.stringify(REG));}catch(_){}};
+const slugOf=u=>{const m=String(u||"").match(/(?:lu\.ma|luma\.com)\/(?:event\/)?([\w-]+)/);return m?m[1]:"";};
+const keysOf=e=>[e.id,slugOf(e.url)].filter(Boolean);
+const sameEvent=(a,b)=>a===b||keysOf(a).some(k=>keysOf(b).includes(k))||(a.title===b.title&&+a.start===+b.start);
+function applyReg(list){return list.map(e=>{const r=keysOf(e).map(k=>REG[k]).find(Boolean);if(!r) return e;
+  // Without exact coordinates, a station named in the address beats the public list's approximate area
+  const ll=r.ll||(guessStation(r.loc)?null:e.ll);
+  return {...e,loc:r.loc,ll,approx:false,registered:true};});}
 // Straight-line metres between [lat,lng] pairs
 function metres(a,b){const r=Math.PI/180,x=(b[1]-a[1])*r*Math.cos((a[0]+b[0])/2*r),y=(b[0]-a[0])*r;return Math.hypot(x,y)*6371e3;}
 function nearestStations(ll,n=3){return Object.entries(STN_XY).map(([s,xy])=>({s,m:metres(ll,xy)})).sort((a,b)=>a.m-b.m).slice(0,n);}
@@ -300,7 +323,10 @@ function parseICS(text){
     const i=ln.indexOf(":");if(i<0) continue;
     const [name,...params]=ln.slice(0,i).split(";");const val=ln.slice(i+1);
     if(name==="SUMMARY") ev.title=unesc(val);
-    else if(name==="LOCATION") ev.loc=unesc(val);
+    // Luma puts a link here instead of the address when the file was downloaded without access to it
+    else if(name==="LOCATION"){const v=unesc(val);if(/^https?:\/\//i.test(v)){ev.placeholder=true;if(!ev.id&&/evt-/.test(v)) ev.id=slugOf(v);}else ev.loc=v;}
+    else if(name==="UID"){const u=val.trim().split("@")[0];if(/^evt-/.test(u)) ev.id=u;}
+    else if(name==="GEO"){const [a,b]=val.split(/[;,]/).map(Number);if(isFinite(a)&&isFinite(b)) ev.ll=[a,b];}
     else if(name==="URL") ev.url=val.trim();
     else if(name==="DTSTART") ev.start=parseDT(val,params);
     else if(name==="DESCRIPTION"&&!ev.url){const m=unesc(val).match(/https?:\/\/(?:lu\.ma|luma\.com)\/\S+/);if(m) ev.url=m[0];}
@@ -351,7 +377,7 @@ function renderDay(){
     if(url){b.href=url;b.target="_blank";b.rel="noopener";b.setAttribute("aria-current",e===current);}
     else{b.type="button";b.setAttribute("aria-pressed",e===current);}
     b.innerHTML=(url?'<span class="ext">Luma ↗</span>':'')+'<span class="t"></span> <strong></strong><br><span class="small"></span>';
-    b.querySelector(".t").textContent=fmtT(e.start);b.querySelector("strong").textContent=e.title||"Untitled";b.querySelector(".small").textContent=e.loc||(e.approx?"Address shown on Luma after you register":"No venue listed");
+    b.querySelector(".t").textContent=fmtT(e.start);b.querySelector("strong").textContent=e.title||"Untitled";b.querySelector(".small").textContent=(e.registered?"✓ Registered · ":"")+(e.loc||(e.approx?"Address hidden in Luma's public list. Tap to see it on Luma.":"No venue listed"));
     if(url) b.setAttribute("aria-label",(e.title||"Untitled")+", "+fmtT(e.start)+". Opens on Luma in a new tab");
     b.onclick=()=>{current=e;renderDay();showEvent();};box.append(b);});
 }
@@ -368,8 +394,11 @@ function showEvent(){
   if(url){const a=document.createElement("a");a.href=url;a.target="_blank";a.rel="noopener";a.textContent=(e.title||"Untitled event")+" ";
     a.insertAdjacentHTML("beforeend",'<span aria-hidden="true">↗</span>');a.title="Open on Luma";h.append(a);}
   else h.textContent=e.title||"Untitled event";
-  $("ev-tag").textContent=e.src==="sg"?"Luma Singapore":"Loaded";$("ev-when").textContent=fmt(e.start);
-  $("ev-loc").textContent=e.loc||(e.approx?"Exact address shown on Luma after you register. Area only.":"No venue listed");
+  $("ev-tag").textContent=e.registered?"Registered":e.src==="sg"?"Luma Singapore":"Added by you";$("ev-when").textContent=fmt(e.start);
+  if(e.loc||!e.approx) $("ev-loc").textContent=e.loc||"No venue listed";
+  else{$("ev-loc").innerHTML="Hidden in Luma's public list. If you've registered, see it on Luma, or "+
+    '<button type="button" class="linkbtn" id="addreg">add your registration</button> to show it here.';
+    $("addreg").onclick=()=>{goTab("ics");$("icsfile").focus();};}
   if(e.ll){const near=nearestStations(e.ll);$("to").value=near[0].s;
     $("tohint").textContent="Nearest to the event"+(e.approx?" area":"")+": "+near.map(x=>x.s+" (~"+Math.round(x.m/10)*10+" m)").join(", ")+". Distances are straight-line.";}
   else if(guessStation(e.loc)){const g=guessStation(e.loc);$("to").value=g;$("tohint").textContent="Matched \""+g+"\" from the venue text. Change it if that's wrong.";}
@@ -401,7 +430,7 @@ function render(){
     const last=r.legs.at(-1);
     html+='<li class="dash"><span class="dot" style="--c:var(--walk)"></span><div class="stn">'+esc(to)+' · alight here</div><div class="small">Follow exit signs toward the venue. Check the station exit map for the closest exit.</div>'+foodButton(to)+'</li>';
   }
-  html+='<li><span class="dot" style="--c:var(--fg)"></span><div class="stn">'+esc(current&&current.title?current.title:"Venue")+'</div><div class="small">'+esc(current&&current.approx?"Event area (exact address after registering)":venue)+'</div>'+(r?"":foodButton(to))+'</li></ol>';
+  html+='<li><span class="dot" style="--c:var(--fg)"></span><div class="stn">'+esc(current&&current.title?current.title:"Venue")+'</div><div class="small">'+esc(current&&current.approx?"Event area (address hidden in Luma's public list)":venue)+'</div>'+(r?"":foodButton(to))+'</li></ol>';
   html+='<div class="links">'+
    '<a target="_blank" rel="noopener" href="'+mapsLink(to+" MRT Station, Singapore",venue,"walking")+'">Walking directions from '+esc(to)+'</a>'+
    '<a target="_blank" rel="noopener" href="'+mapsLink(from+" MRT Station, Singapore",venue,"transit")+'">Full trip in Google Maps</a>'+
@@ -421,16 +450,36 @@ function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",
 
 // ---------- wiring ----------
 for(const id of ["from","to"]){const sel=$(id);sel.innerHTML='<option value="">Select a station</option>'+STATIONS.map(s=>'<option>'+esc(s)+'</option>').join("");sel.onchange=render;}
-document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x===b));
-  document.querySelectorAll("[data-pane]").forEach(p=>p.hidden=p.dataset.pane!==b.dataset.tab);});
-$("icsfile").onchange=e=>{const f=e.target.files[0];if(!f) return;const rd=new FileReader();rd.onload=()=>loadEvents(parseICS(rd.result));rd.readAsText(f);};
-$("icsparse").onclick=()=>loadEvents(parseICS($("icstext").value));
+function goTab(name){document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x.dataset.tab===name));
+  document.querySelectorAll("[data-pane]").forEach(p=>p.hidden=p.dataset.pane!==name);}
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>goTab(b.dataset.tab));
+// Adds addresses from the user's calendar file to matching events instead of replacing the calendar
+function importICS(text){
+  const list=parseICS(text), st=$("icsstate");
+  if(!list.length){st.textContent="No events found. Check that it's a calendar (.ics) file from Luma.";return;}
+  const all=applyReg(SG_EVENTS).concat(extraEvents);
+  let added=[],hidden=0,first=null;
+  for(const p of list){
+    const match=all.find(e=>sameEvent(e,p));
+    if(p.loc){
+      if(match&&match.src==="sg"){for(const k of new Set([...keysOf(p),...keysOf(match)])) REG[k]={loc:p.loc,ll:p.ll||null};}
+      else{extraEvents=extraEvents.filter(x=>!sameEvent(x,p)).concat({...p,approx:false,registered:true,src:"ics"});}
+      added.push(p.title||"Untitled");first=first||p;
+    }else{hidden++;if(!match) extraEvents.push({...p,approx:true,src:"ics"});first=first||p;}
+  }
+  saveReg();showSg(first);
+  st.textContent=(added.length?"Added the address for "+(added.length===1?"“"+added[0]+"”":added.length+" events")+". It's saved on this device. ":"")+
+    (hidden?(hidden===1?"This file doesn't":"Some events in this file don't")+" include the address, which usually means it was downloaded without signing in. Sign in on luma.com, open the event and download its calendar file again, or use the invite from your registration email.":"");
+}
+function readFile(f){const rd=new FileReader();rd.onload=()=>importICS(String(rd.result));rd.readAsText(f);}
+$("icsfile").onchange=e=>{const f=e.target.files[0];if(f) readFile(f);e.target.value="";};
+$("icsparse").onclick=()=>importICS($("icstext").value);
 $("evurl").oninput=e=>{eventUrl=e.target.value.trim();if(current&&!current.sample) {current.url=eventUrl;render();}};
 $("m-use").onclick=()=>{const d=$("m-date").value,t=$("m-time").value||"19:00";
   const start=d?parseDT(d.replace(/-/g,"")+"T"+t.replace(":","")+"00",[]):null;
   if(!start){$("m-date").focus();return;}
-  current={title:$("m-title").value||"My event",start,loc:$("m-loc").value,url:eventUrl};
-  events=events.filter(e=>e.src!=="sg").concat(current).sort((a,b)=>a.start-b.start);goToDay(dayKey(start));showEvent();};
+  const ev={title:$("m-title").value||"My event",start,loc:$("m-loc").value,url:eventUrl,src:"manual"};
+  extraEvents.push(ev);showSg(ev);};
 $("calprev").onclick=()=>{view=view.m?{y:view.y,m:view.m-1}:{y:view.y-1,m:11};renderCal();};
 $("calnext").onclick=()=>{view=view.m<11?{y:view.y,m:view.m+1}:{y:view.y+1,m:0};renderCal();};
 $("calnextev").onclick=()=>{const e=nextEvent();if(!e) return;current=e;goToDay(dayKey(e.start));showEvent();};
@@ -438,16 +487,15 @@ let saved="";try{saved=localStorage.getItem("lm-from")||"";}catch(_){}
 $("from").value=saved&&byStation.has(saved)?saved:"Tampines";
 function sgMeta(){$("sgmeta").textContent=SG_EVENTS.length+" upcoming public events from luma.com/discover/singapore. List fetched from Luma on "+fmt(new Date(sgFetched))+
   ". The app's server fetches a new list every 3 hours.";}
-function showSg(keepUrl){
-  loadEvents(SG_EVENTS);
-  const keep=keepUrl&&SG_EVENTS.find(e=>e.url===keepUrl);
-  if(keep){current=keep;goToDay(dayKey(keep.start));showEvent();}
+// Rebuilds the calendar: Luma Singapore events (with any registered addresses) plus the user's own events
+function showSg(keep){
+  loadEvents(applyReg(SG_EVENTS).concat(extraEvents));
+  const e=keep&&events.find(x=>sameEvent(x,keep));
+  if(e){current=e;goToDay(dayKey(e.start));showEvent();}
   sgMeta();
 }
 async function refreshEvents(manual){
   const btn=$("sgload");btn.disabled=true;$("sgloadtxt").textContent="Refreshing…";$("sgstate").textContent="";
-  // Only replace the calendar if it's showing Luma Singapore events, or the user asked
-  const onSg=!events.length||events[0].src==="sg";
   try{
     const r=await fetch("events.json",{cache:"no-store"});
     if(!r.ok) throw new Error("HTTP "+r.status);
@@ -455,11 +503,10 @@ async function refreshEvents(manual){
     if(!Array.isArray(data.events)||!data.events.length) throw new Error("empty list");
     const before=SG_EVENTS.length;
     SG_EVENTS=toEvents(data.events);sgFetched=data.fetched;
-    if(manual||onSg) showSg(current&&current.src==="sg"?current.url:null); else sgMeta();
+    showSg(current);
     if(manual) $("sgstate").textContent="Updated. "+SG_EVENTS.length+" events"+(SG_EVENTS.length!==before?" ("+(SG_EVENTS.length>before?"+":"")+(SG_EVENTS.length-before)+")":"")+".";
   }catch(err){
-    if(manual){ if(onSg) showSg(current&&current.src==="sg"?current.url:null);
-      $("sgstate").textContent=navigator.onLine?"Couldn't get the latest list. Showing the saved one.":"You're offline. Showing the saved list."; }
+    if(manual){ $("sgstate").textContent=navigator.onLine?"Couldn't get the latest list. Showing the saved one.":"You're offline. Showing the saved list."; }
   }finally{btn.disabled=false;$("sgloadtxt").textContent="Refresh events";}
 }
 $("sgload").onclick=()=>refreshEvents(true);
