@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Pick an upcoming Luma Singapore event and get MRT directions to it.">
+<meta name="theme-color" content="#f3f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f151b" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Luma MRT">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Luma to MRT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;800&family=Overpass+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: transit-signage tool. Left column = event + trip inputs, right = route strip. Stacks on phones. */
+:root{
+  --bg:#f3f5f7; --panel:#ffffff; --fg:#14202b; --muted:#5b6b78; --line:#d6dde3; --accent:#0b5fae; --warn:#a15c00;
+  --ns:#d42e12; --ew:#009645; --cc:#fa9e0d; --ne:#9900aa; --dt:#005ec4; --te:#9d5b25; --walk:#7b8a96;
+  --onaccent:#ffffff;
+  --display:"Overpass",system-ui,sans-serif; --body:"Overpass",system-ui,sans-serif; --mono:"Overpass Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f151b; --panel:#17212a; --fg:#e7edf2; --muted:#9aaab6; --line:#2a3743; --accent:#6cb2f5; --warn:#f0b35c; --walk:#8c9aa5; --onaccent:#0f151b; color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f151b; --panel:#17212a; --fg:#e7edf2; --muted:#9aaab6; --line:#2a3743; --accent:#6cb2f5; --warn:#f0b35c; --walk:#8c9aa5; --onaccent:#0f151b; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5;padding:0 16px}
+.wrap{max-width:1080px;margin:0 auto;padding-block:28px 56px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;border-bottom:3px solid var(--fg);padding-bottom:12px;margin-bottom:22px}
+h1{font-family:var(--display);font-weight:800;font-size:clamp(26px,4vw,36px);margin:0;letter-spacing:-.01em;text-wrap:balance}
+.stripes{display:flex;gap:4px}.stripes i{width:22px;height:8px;border-radius:2px;display:block}
+.sub{color:var(--muted);margin:4px 0 0;max-width:60ch}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:20px;align-items:start}
+@media (max-width:820px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+h2{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0;font-weight:600}
+h3{margin:0;font-size:20px;font-weight:800;text-wrap:balance}
+label{font-size:13px;font-weight:600;display:block;margin-bottom:4px}
+input,select,textarea{width:100%;font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+textarea{font-family:var(--mono);font-size:12px;min-height:84px;resize:vertical}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media (max-width:480px){.row{grid-template-columns:1fr}}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tabs button,.btn{font:inherit;font-weight:600;font-size:13px;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:999px;padding:6px 12px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--onaccent)}
+.hint{font-size:13px;color:var(--muted);margin:0}
+.note{font-size:13px;border-left:3px solid var(--warn);padding:6px 10px;background:var(--bg);border-radius:0 6px 6px 0;margin:0}
+.cal{border:1px solid var(--line);border-radius:8px;padding:10px}
+.calhead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.calhead strong{font-size:15px}
+.calnav{font:inherit;font-size:18px;line-height:1;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:6px;width:34px;height:34px;cursor:pointer}
+.calgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin-top:8px}
+.dow{font-size:11px;text-align:center;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;padding-bottom:2px}
+.day{font:inherit;font-size:14px;font-variant-numeric:tabular-nums;height:46px;min-width:0;border:1px solid transparent;background:transparent;color:var(--fg);border-radius:6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0}
+.day:hover{border-color:var(--line)}
+.day.past{color:var(--muted)}
+.day.has{font-weight:800}
+.day.today{border-color:var(--fg)}
+.day[aria-pressed="true"]{background:var(--accent);color:var(--onaccent);border-color:var(--accent)}
+.dots{display:flex;gap:2px;height:5px}.dots i{width:5px;height:5px;border-radius:50%;background:var(--accent)}
+.day[aria-pressed="true"] .dots i{background:var(--onaccent)}
+.daybar{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.evlist .t{font-family:var(--mono);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.evlist{display:flex;flex-direction:column;gap:6px}
+.evlist button{text-align:left;font:inherit;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;cursor:pointer}
+.evlist button[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.meta{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px}.meta dt{color:var(--muted)}.meta dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.tag{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.summary{display:flex;flex-wrap:wrap;gap:18px;align-items:baseline}
+.big{font-family:var(--mono);font-size:30px;font-weight:600;font-variant-numeric:tabular-nums}
+.small{font-size:13px;color:var(--muted)}
+.strip{list-style:none;margin:0;padding:0}
+.strip li{position:relative;padding:0 0 18px 34px}
+.strip li::before{content:"";position:absolute;left:9px;top:6px;bottom:-6px;width:6px;background:var(--c,var(--walk));border-radius:3px}
+.strip li.dash::before{background:repeating-linear-gradient(var(--walk) 0 6px,transparent 6px 11px)}
+.strip li:last-child::before{display:none}
+.dot{position:absolute;left:3px;top:2px;width:18px;height:18px;border-radius:50%;background:var(--panel);border:4px solid var(--c,var(--fg))}
+.stn{font-weight:800;font-size:16px}
+.pill{display:inline-block;color:#fff;font-weight:700;font-size:12px;padding:1px 8px;border-radius:4px;background:var(--c);margin-right:6px;vertical-align:1px}
+.links{display:flex;flex-wrap:wrap;gap:8px}
+.links a{color:var(--accent);font-weight:600;font-size:14px}
+details{border-top:1px solid var(--line);padding-top:12px}
+summary{cursor:pointer;font-weight:700}
+.plan{margin-top:28px}
+.plan .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.plan p,.plan li{max-width:68ch}
+.plan ul,.plan ol{padding-left:20px;margin:6px 0}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tbl{overflow-x:auto}
+code{font-family:var(--mono);font-size:13px}
+@media (prefers-reduced-motion:no-preference){.strip li{animation:in .3s ease both}@keyframes in{from{transform:translateY(4px);opacity:.4}}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <div class="stripes" aria-hidden="true"><i style="background:var(--ns)"></i><i style="background:var(--ew)"></i><i style="background:var(--ne)"></i><i style="background:var(--cc)"></i><i style="background:var(--dt)"></i><i style="background:var(--te)"></i></div>
+    <h1>Luma to MRT</h1>
+    <p class="sub">Load your next Luma event, pick the MRT station you're starting from, and get the lines, interchanges and stop to alight at. Nothing leaves this page.</p>
+  </div>
+  <span class="tag">Prototype</span>
+</header>
+
+<div class="grid">
+<section class="panel" aria-labelledby="ev-h">
+  <h2 id="ev-h">1 · Your event</h2>
+  <div class="tabs" role="tablist">
+    <button role="tab" id="t-sg" aria-selected="true" data-tab="sg">Luma Singapore</button>
+    <button role="tab" id="t-ics" aria-selected="false" data-tab="ics">Luma calendar file</button>
+    <button role="tab" id="t-url" aria-selected="false" data-tab="url">Event link</button>
+    <button role="tab" id="t-man" aria-selected="false" data-tab="man">Type it in</button>
+  </div>
+
+  <div data-pane="sg">
+    <p class="hint" id="sgmeta"></p>
+    <button class="btn" id="sgload" style="margin-top:6px">Show Luma Singapore events</button>
+  </div>
+  <div data-pane="ics" hidden>
+    <label for="icsfile">Upload an .ics file from Luma</label>
+    <input type="file" id="icsfile" accept=".ics,text/calendar">
+    <p class="hint" style="margin-top:6px">Get it from an event's "Add to Calendar" button, or from the iCal subscription under Luma Settings → Calendar Syncing (that feed lists events you've registered for). You can also paste the file's text:</p>
+    <textarea id="icstext" placeholder="BEGIN:VCALENDAR …"></textarea>
+    <button class="btn" id="icsparse" style="margin-top:6px">Read pasted calendar</button>
+  </div>
+  <div data-pane="url" hidden>
+    <label for="evurl">Luma event link</label>
+    <input id="evurl" type="url" placeholder="https://luma.com/abc123">
+    <p class="note" style="margin-top:8px">This preview can't fetch Luma pages: the browser sandbox blocks it. The full app reads the public event page on its server. For now the link is kept for the map buttons, and you fill in the venue under "Type it in".</p>
+  </div>
+  <div data-pane="man" hidden>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div><label for="m-title">Event name</label><input id="m-title"></div>
+      <div class="row">
+        <div><label for="m-date">Date</label><input id="m-date" type="date"></div>
+        <div><label for="m-time">Start time (SGT)</label><input id="m-time" type="time"></div>
+      </div>
+      <div><label for="m-loc">Venue or address</label><input id="m-loc"></div>
+      <button class="btn primary" id="m-use">Use this event</button>
+    </div>
+  </div>
+
+  <div class="cal" aria-label="Event calendar">
+    <div class="calhead">
+      <button type="button" class="calnav" id="calprev" aria-label="Previous month">‹</button>
+      <strong id="calmonth" aria-live="polite"></strong>
+      <button type="button" class="calnav" id="calnext" aria-label="Next month">›</button>
+    </div>
+    <div class="calgrid" id="calgrid"></div>
+  </div>
+  <div class="daybar"><p class="hint" id="calstatus"></p><button type="button" class="btn" id="calnextev">Next event</button></div>
+  <div id="daylist" class="evlist" aria-live="polite"></div>
+
+  <div id="evcard" style="display:flex;flex-direction:column;gap:8px">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><h3 id="ev-title"></h3><span class="tag" id="ev-tag"></span></div>
+    <dl class="meta">
+      <dt>When</dt><dd id="ev-when"></dd>
+      <dt>Venue</dt><dd id="ev-loc"></dd>
+    </dl>
+  </div>
+
+  <h2 style="margin-top:6px">2 · Your trip</h2>
+  <div class="row">
+    <div><label for="from">Starting station</label><select id="from"></select></div>
+    <div><label for="to">Station nearest the venue</label><select id="to"></select></div>
+  </div>
+  <p class="hint" id="tohint"></p>
+  <p class="hint">Using your phone's location to find the nearest station is a planned option and will only run after you allow it. This preview asks for your station instead.</p>
+</section>
+
+<section class="panel" aria-labelledby="rt-h" aria-live="polite">
+  <h2 id="rt-h">3 · Your route</h2>
+  <div id="route"></div>
+</section>
+</div>
+
+<section class="panel plan" aria-labelledby="plan-h">
+  <h2 id="plan-h">Build plan</h2>
+  <div class="cols">
+    <div>
+      <h3 style="font-size:17px">Where event data can come from</h3>
+      <div class="tbl"><table>
+        <tr><th>Source</th><th>Works for</th><th>Notes</th></tr>
+        <tr><td>Luma city page (luma.com/discover/singapore)</td><td>Public events in Singapore</td><td>No login. The page loads its list from Luma's public discover feed, which includes each event's map coordinates. Refresh on the server a few times a day; respect Luma's terms. Venues of some events are hidden until you register, so only the area is known.</td></tr>
+        <tr><td>Luma iCal subscription</td><td>Events you registered for</td><td>Best fit for "my next event". The feed URL is private to you: store it encrypted on the server and never log it.</td></tr>
+        <tr><td>Event link</td><td>Any public event</td><td>Server fetches the public page and reads title, start time and venue from its metadata. Check Luma's terms; cache results and rate-limit.</td></tr>
+        <tr><td>.ics file / manual entry</td><td>Anything</td><td>No account access needed. What this preview uses.</td></tr>
+        <tr><td>Luma API</td><td>Hosts only</td><td>Needs Luma Plus and a key scoped to a calendar you manage. It doesn't list events you're attending elsewhere.</td></tr>
+      </table></div>
+    </div>
+    <div>
+      <h3 style="font-size:17px">App flow</h3>
+      <ol>
+        <li>Pick a source: Luma's Singapore events list (default), your Luma iCal feed, an event link, or a file.</li>
+        <li>Show the events on a month calendar. Tapping a date lists that day's events, and the user picks one. The next upcoming event is selected to start.</li>
+        <li>Find the nearest stations from the event's coordinates (or geocode the address with OneMap), then the closest exit.</li>
+        <li>Ask for a starting station, or with consent use device location to suggest one.</li>
+        <li>Route on the MRT graph: lines, direction, interchanges, alighting stop, time.</li>
+        <li>Walking leg from the best exit (OneMap walk routing), plus Google Maps and OneMap links.</li>
+        <li>Show "leave by" time from the event start, with a reminder option.</li>
+      </ol>
+    </div>
+    <div>
+      <h3 style="font-size:17px">Stack and data</h3>
+      <ul>
+        <li>Next.js or similar with a small server for feed fetching and page parsing (no CORS issues, secrets stay server side).</li>
+        <li>Station and exit coordinates: LTA datasets on data.gov.sg / LTA DataMall. Refresh when lines open.</li>
+        <li>Routing: own graph for MRT legs; OneMap routing API (free account token) or Google Directions transit for walking and door-to-door checks.</li>
+        <li>Train disruptions: LTA DataMall train service alerts, shown above the route.</li>
+      </ul>
+      <p class="hint">Preview limits: station list is hand-entered and covers the six MRT lines (no LRT, no Circle Line Stage 6). Timings are estimates (about 2.3 min per stop, 5 min per transfer). Always check the live map links.</p>
+    </div>
+  </div>
+</section>
+</div>
+
+<script>
+// Snapshot of luma.com/discover/singapore + station coordinates (sgraildata)
+const STN_XY={"Jurong East":[1.33312,103.7423],"Bukit Batok":[1.34906,103.74959],"Bukit Gombak":[1.35889,103.75182],"Choa Chu Kang":[1.38475,103.74453],"Yew Tee":[1.39746,103.7474],"Kranji":[1.42522,103.76199],"Marsiling":[1.43254,103.77422],"Woodlands":[1.43718,103.78696],"Admiralty":[1.44064,103.80096],"Sembawang":[1.44909,103.82006],"Canberra":[1.44337,103.8295],"Yishun":[1.42938,103.83503],"Khatib":[1.41732,103.833],"Yio Chu Kang":[1.38178,103.84497],"Ang Mo Kio":[1.37005,103.84954],"Bishan":[1.35146,103.84826],"Braddell":[1.3406,103.84679],"Toa Payoh":[1.3323,103.84733],"Novena":[1.32008,103.84349],"Newton":[1.31296,103.83886],"Orchard":[1.30322,103.83198],"Somerset":[1.30033,103.8385],"Dhoby Ghaut":[1.29879,103.84502],"City Hall":[1.29321,103.85183],"Raffles Place":[1.28441,103.85147],"Marina Bay":[1.27517,103.85475],"Marina South Pier":[1.27175,103.86272],"Pasir Ris":[1.37303,103.94925],"Tampines":[1.35337,103.94508],"Simei":[1.34318,103.95338],"Tanah Merah":[1.32726,103.94651],"Bedok":[1.32394,103.93],"Kembangan":[1.32106,103.91276],"Eunos":[1.31981,103.90306],"Paya Lebar":[1.31805,103.89232],"Aljunied":[1.31626,103.88267],"Kallang":[1.31145,103.87134],"Lavender":[1.30744,103.86303],"Bugis":[1.30053,103.85609],"Tanjong Pagar":[1.27657,103.84588],"Outram Park":[1.28069,103.84024],"Tiong Bahru":[1.28609,103.82764],"Redhill":[1.28965,103.81676],"Queenstown":[1.29455,103.80605],"Commonwealth":[1.30244,103.79831],"Buona Vista":[1.30726,103.79071],"Dover":[1.31142,103.77863],"Clementi":[1.3151,103.76523],"Chinese Garden":[1.34247,103.73259],"Lakeside":[1.3443,103.7208],"Boon Lay":[1.33847,103.70578],"Pioneer":[1.33757,103.69735],"Joo Koon":[1.32772,103.67829],"Gul Circle":[1.31942,103.66042],"Tuas Crescent":[1.32081,103.64957],"Tuas West Road":[1.3295,103.64015],"Tuas Link":[1.34043,103.63696],"Expo":[1.33564,103.96224],"Changi Airport":[1.35734,103.98856],"HarbourFront":[1.26539,103.8224],"Chinatown":[1.28502,103.844],"Clarke Quay":[1.28898,103.84687],"Little India":[1.30657,103.8493],"Farrer Park":[1.31271,103.85438],"Boon Keng":[1.31982,103.86152],"Potong Pasir":[1.33125,103.86909],"Woodleigh":[1.3392,103.87075],"Serangoon":[1.34981,103.87377],"Kovan":[1.35998,103.88487],"Hougang":[1.3719,103.89275],"Buangkok":[1.38306,103.89305],"Sengkang":[1.39133,103.89529],"Punggol":[1.40525,103.90235],"Punggol Coast":[1.41502,103.91033],"Bras Basah":[1.2969,103.85055],"Esplanade":[1.29326,103.85597],"Promenade":[1.29385,103.86015],"Nicoll Highway":[1.29967,103.8635],"Stadium":[1.30295,103.87539],"Mountbatten":[1.30625,103.8825],"Dakota":[1.30844,103.88832],"MacPherson":[1.32673,103.8901],"Tai Seng":[1.33487,103.88815],"Bartley":[1.34244,103.88045],"Lorong Chuan":[1.35149,103.86339],"Marymount":[1.34861,103.83924],"Caldecott":[1.33768,103.83999],"Botanic Gardens":[1.32256,103.81575],"Farrer Road":[1.31763,103.80778],"Holland Village":[1.31212,103.79574],"one-north":[1.29961,103.78724],"Kent Ridge":[1.2933,103.78441],"Haw Par Villa":[1.28265,103.78177],"Pasir Panjang":[1.27618,103.79161],"Labrador Park":[1.27233,103.80278],"Telok Blangah":[1.27059,103.80986],"Bayfront":[1.28253,103.85973],"Bukit Panjang":[1.3783,103.76214],"Cashew":[1.36966,103.76448],"Hillview":[1.36245,103.76707],"Hume":[1.35434,103.76921],"Beauty World":[1.34166,103.77594],"King Albert Park":[1.33566,103.78416],"Sixth Avenue":[1.33059,103.79722],"Tan Kah Kee":[1.3257,103.80775],"Stevens":[1.32019,103.82546],"Rochor":[1.30395,103.85263],"Downtown":[1.27919,103.85335],"Telok Ayer":[1.28212,103.84874],"Fort Canning":[1.29239,103.84416],"Bencoolen":[1.29886,103.85037],"Jalan Besar":[1.30513,103.85523],"Bendemeer":[1.31358,103.86307],"Geylang Bahru":[1.32161,103.87198],"Mattar":[1.32697,103.88296],"Ubi":[1.32976,103.89938],"Kaki Bukit":[1.33502,103.90861],"Bedok North":[1.33475,103.91804],"Bedok Reservoir":[1.33628,103.93189],"Tampines West":[1.34552,103.93856],"Tampines East":[1.35608,103.95498],"Upper Changi":[1.34169,103.96126],"Woodlands North":[1.44865,103.78552],"Woodlands South":[1.42715,103.7943],"Springleaf":[1.39777,103.81793],"Lentor":[1.38474,103.83663],"Mayflower":[1.37215,103.83679],"Bright Hill":[1.36345,103.83284],"Upper Thomson":[1.35449,103.83282],"Napier":[1.30709,103.81901],"Orchard Boulevard":[1.30241,103.82401],"Great World":[1.29462,103.83348],"Havelock":[1.28749,103.83371],"Maxwell":[1.28069,103.84401],"Shenton Way":[1.27766,103.85055],"Gardens by the Bay":[1.27945,103.86812],"Tanjong Rhu":[1.29726,103.87345],"Katong Park":[1.29783,103.88618],"Tanjong Katong":[1.29932,103.89737],"Marine Parade":[1.30261,103.90498],"Marine Terrace":[1.30666,103.91511],"Siglap":[1.31001,103.93003],"Bayshore":[1.31312,103.94231]};
+const LUMA_SNAPSHOT={source:"https://luma.com/discover/singapore",fetched:"2026-10-12T02:56:49.306Z",events:[{"t":"DeepHumanity.ai Storylabs Session & Networking","s":"2026-10-12T10:30:00.000Z","e":"2026-10-12T12:30:00.000Z","u":"https://luma.com/mas4a3v1","l":"*SCAPE, 2 Orchard Link, Singapore 237978","p":"*SCAPE","online":false,"ll":[1.30106,103.83566]},{"t":"SIDE QUESTS AND XP FARMING","s":"2026-10-12T10:30:00.000Z","e":"2026-10-12T13:00:00.000Z","u":"https://luma.com/k0cfx5g5","l":"","p":"","online":false,"ll":[1.2987,103.84866]},{"t":"The Enterprise AI Mixer with OpenAI, Supabase, FailSafe, Notion, and AWS","s":"2026-10-12T10:30:00.000Z","e":"2026-10-12T13:30:00.000Z","u":"https://luma.com/3ypd6s00","l":"","p":"","online":false,"ll":[1.28281,103.84778]},{"t":"Singapore | Claude Code Build Day - Opus 5.5","s":"2026-10-13T05:30:00.000Z","e":"2026-10-13T09:30:00.000Z","u":"https://luma.com/claude-9uq9","l":"","p":"","online":false,"ll":[1.2895,103.79209]},{"t":"MAP: Aviation Edition","s":"2026-10-13T06:30:00.000Z","e":"2026-10-13T09:00:00.000Z","u":"https://luma.com/cmgwqsk3","l":"Lorong AI @ One-North, 69 Ayer Rajah Cres., Level 3 Vidacity, Singapore 139961","p":"Lorong AI @ One-North","online":false,"ll":[1.29617,103.78701]},{"t":"Singapore | Claude Meetup #11 - Special Edition","s":"2026-10-13T10:00:00.000Z","e":"2026-10-13T13:00:00.000Z","u":"https://luma.com/claude-envo","l":"","p":"","online":false,"ll":[1.29228,103.79398]},{"t":"AI x Climate Risk: From Forecast to Decision","s":"2026-10-13T10:30:00.000Z","e":"2026-10-13T13:00:00.000Z","u":"https://luma.com/hzc10o5v","l":"Lorong AI @ One-North, 69 Ayer Rajah Cres., Level 3 Vidacity, Singapore 139961","p":"Lorong AI @ One-North","online":false,"ll":[1.29617,103.78701]},{"t":"Singapore AI & Robotics Demo Night (Oct 2026)","s":"2026-10-13T10:30:00.000Z","e":"2026-10-13T12:30:00.000Z","u":"https://luma.com/md250vu1","l":"National Library / Lee Kong Chian Reference Library, 100 Victoria St, Singapore 188064","p":"National Library / Lee Kong Chian Reference Library","online":false,"ll":[1.29759,103.85431]},{"t":"field:work | Break(ing)Beats with Strudel","s":"2026-10-13T11:00:00.000Z","e":"2026-10-13T13:00:00.000Z","u":"https://luma.com/m82vtowz","l":"Arts x Tech Lab, 28 Aliwal St, #02-05 Aliwal Arts Centre, Singapore 199918","p":"Arts x Tech Lab","online":false,"ll":[1.3027,103.86098]},{"t":"An Evening With Jenny Lee: 21 Unicorns, 18 IPOs, Two Decades of Backing Asia's Best","s":"2026-10-15T09:00:00.000Z","e":"2026-10-15T11:30:00.000Z","u":"https://luma.com/b90uqppv","l":"INSEAD Asia Campus, 1 Ayer Rajah Ave, Singapore 138676","p":"INSEAD Asia Campus","online":false,"ll":[1.29992,103.78655]},{"t":"AI Masterclass: Product-market Fit & Agent-First Development | Powered by Google for Startups","s":"2026-10-16T08:00:00.000Z","e":"2026-10-16T10:30:00.000Z","u":"https://luma.com/ywbj8rld","l":"","p":"","online":false,"ll":[1.29666,103.78784]},{"t":"OpenAgent Meetup: Muse + Instinct","s":"2026-10-16T10:00:00.000Z","e":"2026-10-16T13:00:00.000Z","u":"https://luma.com/hu7anx12","l":"","p":"","online":false,"ll":[1.29533,103.84846]},{"t":"Pour&Ponder: Why Buildings Aren't Real","s":"2026-10-16T11:00:00.000Z","e":"2026-10-16T13:00:00.000Z","u":"https://luma.com/g9fzkh90","l":"Alma House, 46 Kim Yam Rd, #03-03, Singapore 239351","p":"Alma House","online":false,"ll":[1.2922,103.83904]},{"t":"Beats, Baos & After-Hours: Singapore’s First Dim Sum Rave","s":"2026-10-16T14:00:00.000Z","e":"2026-10-16T18:00:00.000Z","u":"https://luma.com/xdj25bzg","l":"Sip Sip, 63 Chulia St, #01-01, Singapore 049514","p":"Sip Sip","online":false,"ll":[1.28507,103.84976]},{"t":"Opening Reception Zeng Jianyong Solo Exhibition | 曾健勇个展开幕式","s":"2026-10-17T07:00:00.000Z","e":"2026-10-17T09:00:00.000Z","u":"https://luma.com/2d707wtw","l":"Prestige Gallery, 39 Keppel Rd, #03-01, Singapore 089065","p":"Prestige Gallery","online":false,"ll":[1.27193,103.8362]},{"t":"Academic Lecture: Modern and Contemporary Ink 学术讲座：现代水墨和当代水墨","s":"2026-10-18T06:00:00.000Z","e":"2026-10-18T08:00:00.000Z","u":"https://luma.com/x8o240hf","l":"Prestige Gallery, 39 Keppel Rd, #03-01, Singapore 089065","p":"Prestige Gallery","online":false,"ll":[1.27193,103.8362]},{"t":"Claude for Marketing","s":"2026-10-19T10:30:00.000Z","e":"2026-10-19T13:30:00.000Z","u":"https://luma.com/fe25l2au","l":"Lifelong Learning Institute, 11 Eunos Rd 8, Singapore 408601","p":"Lifelong Learning Institute","online":false,"ll":[1.31971,103.89244]},{"t":"AI Labs Singapore","s":"2026-10-20T07:00:00.000Z","e":"2026-10-20T10:30:00.000Z","u":"https://luma.com/notion-nvm0","l":"PARKROYAL COLLECTION Pickering, 3 Upper Pickering St, Singapore 058289","p":"PARKROYAL COLLECTION Pickering","online":false,"ll":[1.28576,103.84604]},{"t":"Techies x SGInnovate Tech Talk: New Dev Roles in the AI era","s":"2026-10-22T10:30:00.000Z","e":"2026-10-22T13:00:00.000Z","u":"https://luma.com/i8iy0fzc","l":"SGInnovate, 32 Carpenter St, Singapore 059911","p":"SGInnovate","online":false,"ll":[1.28815,103.84758]},{"t":"Founder House Singapore 🇸🇬","s":"2026-10-23T01:30:00.000Z","e":"2026-10-25T11:30:00.000Z","u":"https://luma.com/openhouse-singapore","l":"","p":"","online":false,"ll":[1.31635,103.89195]},{"t":"Got an idea? Let's see it with Lovable @AWS Singapore","s":"2026-10-23T09:00:00.000Z","e":"2026-10-23T13:00:00.000Z","u":"https://luma.com/1xmnx8sy","l":"Amazon Web Services Singapore Pte Ltd, 2 Central Blvd, Singapore","p":"Amazon Web Services Singapore Pte Ltd","online":false,"ll":[1.28011,103.85117]},{"t":"TEDxSingapore Main Stage 2026: Landing Points","s":"2026-10-24T06:00:00.000Z","e":"2026-10-24T10:30:00.000Z","u":"https://luma.com/tedxsingapore2026","l":"Victoria Theatre, 9 Empress Pl, Singapore 179556","p":"Victoria Theatre","online":false,"ll":[1.28828,103.85156]},{"t":"Celebrating Gulzar | 24th October, 3.30pm","s":"2026-10-24T07:30:00.000Z","e":"2026-10-24T09:00:00.000Z","u":"https://luma.com/gulzar24-3.30pm","l":"Centre 42, 42 Waterloo St, 42, Singapore 187951","p":"Centre 42","online":false,"ll":[1.29842,103.85078]},{"t":"Founder Park_AGI Playground Founder Show @Singapore","s":"2026-10-30T06:00:00.000Z","e":"2026-10-30T10:00:00.000Z","u":"https://luma.com/yevjd99y","l":"","p":"","online":false,"ll":[1.29358,103.77769]},{"t":"Improv Comedy Live - Base Show 3","s":"2026-10-31T07:30:00.000Z","e":"2026-10-31T09:30:00.000Z","u":"https://luma.com/bxf6vzea","l":"Centre 42, 42 Waterloo St, 42, Singapore 187951","p":"Centre 42","online":false,"ll":[1.29842,103.85078]},{"t":"Culture Club: The Last Supper Club","s":"2026-10-31T10:30:00.000Z","e":"2026-10-31T14:30:00.000Z","u":"https://luma.com/xq339bu5","l":"","p":"","online":false,"ll":[1.32675,103.80918]},{"t":"Build with ElevenLabs: Voice AI & Creative Agents","s":"2026-11-10T10:30:00.000Z","e":"2026-11-10T13:00:00.000Z","u":"https://luma.com/olv1aat3","l":"Infocomm Media Development Authority (IMDA), 10 Pasir Panjang Rd, #03-01 Mapletree Business City, Singapore 117438","p":"Infocomm Media Development Authority (IMDA)","online":false,"ll":[1.27426,103.7997]},{"t":"The Book Swap. Women-only.","s":"2026-11-14T08:00:00.000Z","e":"2026-11-14T10:00:00.000Z","u":"https://luma.com/tbx99gzg","l":"Chapters @ Maxwell, 35 Kreta Ayer Rd, #02-01, Singapore 089000","p":"Chapters @ Maxwell","online":false,"ll":[1.28075,103.84227]},{"t":"SQ micro-duck farm","s":"2026-12-31T10:30:00.000Z","e":"2026-12-31T11:30:00.000Z","u":"https://luma.com/ai-nfa5","l":"SQ Collective x Gen-AI Labs, 65 Mohamed Sultan Rd, Singapore 239003","p":"SQ Collective x Gen-AI Labs","online":false,"ll":[1.29136,103.83944]}]};
+const LINES={
+ NS:{n:"North–South Line",c:"--ns",s:["Jurong East","Bukit Batok","Bukit Gombak","Choa Chu Kang","Yew Tee","Kranji","Marsiling","Woodlands","Admiralty","Sembawang","Canberra","Yishun","Khatib","Yio Chu Kang","Ang Mo Kio","Bishan","Braddell","Toa Payoh","Novena","Newton","Orchard","Somerset","Dhoby Ghaut","City Hall","Raffles Place","Marina Bay","Marina South Pier"]},
+ EW:{n:"East–West Line",c:"--ew",s:["Pasir Ris","Tampines","Simei","Tanah Merah","Bedok","Kembangan","Eunos","Paya Lebar","Aljunied","Kallang","Lavender","Bugis","City Hall","Raffles Place","Tanjong Pagar","Outram Park","Tiong Bahru","Redhill","Queenstown","Commonwealth","Buona Vista","Dover","Clementi","Jurong East","Chinese Garden","Lakeside","Boon Lay","Pioneer","Joo Koon","Gul Circle","Tuas Crescent","Tuas West Road","Tuas Link"]},
+ CG:{n:"East–West Line (Changi Airport branch)",c:"--ew",s:["Tanah Merah","Expo","Changi Airport"]},
+ NE:{n:"North East Line",c:"--ne",s:["HarbourFront","Outram Park","Chinatown","Clarke Quay","Dhoby Ghaut","Little India","Farrer Park","Boon Keng","Potong Pasir","Woodleigh","Serangoon","Kovan","Hougang","Buangkok","Sengkang","Punggol","Punggol Coast"]},
+ CC:{n:"Circle Line",c:"--cc",s:["Dhoby Ghaut","Bras Basah","Esplanade","Promenade","Nicoll Highway","Stadium","Mountbatten","Dakota","Paya Lebar","MacPherson","Tai Seng","Bartley","Serangoon","Lorong Chuan","Bishan","Marymount","Caldecott","Botanic Gardens","Farrer Road","Holland Village","Buona Vista","one-north","Kent Ridge","Haw Par Villa","Pasir Panjang","Labrador Park","Telok Blangah","HarbourFront"]},
+ CE:{n:"Circle Line (Marina Bay branch)",c:"--cc",s:["Promenade","Bayfront","Marina Bay"]},
+ DT:{n:"Downtown Line",c:"--dt",s:["Bukit Panjang","Cashew","Hillview","Hume","Beauty World","King Albert Park","Sixth Avenue","Tan Kah Kee","Botanic Gardens","Stevens","Newton","Little India","Rochor","Bugis","Promenade","Bayfront","Downtown","Telok Ayer","Chinatown","Fort Canning","Bencoolen","Jalan Besar","Bendemeer","Geylang Bahru","Mattar","MacPherson","Ubi","Kaki Bukit","Bedok North","Bedok Reservoir","Tampines West","Tampines","Tampines East","Upper Changi","Expo"]},
+ TE:{n:"Thomson–East Coast Line",c:"--te",s:["Woodlands North","Woodlands","Woodlands South","Springleaf","Lentor","Mayflower","Bright Hill","Upper Thomson","Caldecott","Stevens","Napier","Orchard Boulevard","Orchard","Great World","Havelock","Outram Park","Maxwell","Shenton Way","Marina Bay","Gardens by the Bay","Tanjong Rhu","Katong Park","Tanjong Katong","Marine Parade","Marine Terrace","Siglap","Bayshore"]}
+};
+const SHORT={NS:"NS",EW:"EW",CG:"EW",NE:"NE",CC:"CC",CE:"CC",DT:"DT",TE:"TE"};
+const STOP_MIN=2.3, XFER_MIN=5;
+// Landmarks people write in Luma venue fields -> nearest station (best guess, user can override)
+const LANDMARKS={"block71":"one-north","ayer rajah":"one-north","fusionopolis":"one-north","biopolis":"one-north","launchpad":"one-north","marina bay sands":"Bayfront","sands expo":"Bayfront","suntec":"Promenade","raffles city":"City Hall","funan":"City Hall","national gallery":"City Hall","smu":"Bras Basah","national library":"Bras Basah","bugis junction":"Bugis","paya lebar quarter":"Paya Lebar","plq":"Paya Lebar","vivocity":"HarbourFront","sentosa":"HarbourFront","jewel":"Changi Airport","singapore expo":"Expo","changi business park":"Expo","nus":"Kent Ridge","ntu":"Boon Lay","guoco tower":"Tanjong Pagar","star vista":"Buona Vista","gardens by the bay":"Gardens by the Bay","ion orchard":"Orchard","one raffles quay":"Downtown","marina one":"Downtown"};
+
+// Graph: node = "LINE|Station"
+const adj=new Map(), byStation=new Map();
+function edge(a,b,w,kind){(adj.get(a)||adj.set(a,[]).get(a)).push({to:b,w,kind});}
+for(const [L,{s}] of Object.entries(LINES)){
+  s.forEach((st,i)=>{const k=L+"|"+st;(byStation.get(st)||byStation.set(st,[]).get(st)).push(k);
+    if(i>0){const p=L+"|"+s[i-1];edge(p,k,STOP_MIN,"ride");edge(k,p,STOP_MIN,"ride");}});
+}
+for(const ks of byStation.values()) for(const a of ks) for(const b of ks) if(a!==b) edge(a,b,XFER_MIN,"xfer");
+const STATIONS=[...byStation.keys()].sort((a,b)=>a.localeCompare(b));
+
+function route(from,to){
+  if(from===to) return null;
+  const dist=new Map(), prev=new Map(), q=[];
+  for(const k of byStation.get(from)){dist.set(k,0);q.push(k);}
+  const done=new Set();
+  while(q.length){
+    q.sort((a,b)=>dist.get(a)-dist.get(b)); const u=q.shift();
+    if(done.has(u)) continue; done.add(u);
+    for(const e of adj.get(u)||[]){const nd=dist.get(u)+e.w;
+      if(nd<(dist.get(e.to)??Infinity)){dist.set(e.to,nd);prev.set(e.to,u);q.push(e.to);}}
+  }
+  let best=null; for(const k of byStation.get(to)) if(dist.has(k)&&(!best||dist.get(k)<dist.get(best))) best=k;
+  const path=[]; for(let k=best;k;k=prev.get(k)) path.unshift(k);
+  // compress into legs; merge branch hops that need no real transfer (CC<->CE through Promenade is a change, keep it)
+  const legs=[]; let cur=null;
+  for(let i=0;i<path.length;i++){const [L,st]=path[i].split("|");
+    if(!cur||cur.line!==L){ if(cur&&cur.stops.length<2){legs.pop();} cur={line:L,stops:[st]};legs.push(cur);} else cur.stops.push(st);}
+  const real=legs.filter(l=>l.stops.length>1);
+  real.forEach(l=>{const s=LINES[l.line].s;const a=s.indexOf(l.stops[0]),b=s.indexOf(l.stops.at(-1));l.toward=b>a?s.at(-1):s[0];l.n=Math.abs(b-a);});
+  return {legs:real,mins:Math.round(dist.get(best))};
+}
+
+// ---------- event handling ----------
+const $=id=>document.getElementById(id);
+let events=[], current=null, eventUrl="", view={y:0,m:0}, selDay="";
+const SG_EVENTS=LUMA_SNAPSHOT.events.map(e=>({title:e.t,start:new Date(e.s),url:e.u,ll:e.ll,loc:e.l,approx:!e.l,src:"sg"}));
+// Straight-line metres between [lat,lng] pairs
+function metres(a,b){const r=Math.PI/180,x=(b[1]-a[1])*r*Math.cos((a[0]+b[0])/2*r),y=(b[0]-a[0])*r;return Math.hypot(x,y)*6371e3;}
+function nearestStations(ll,n=3){return Object.entries(STN_XY).map(([s,xy])=>({s,m:metres(ll,xy)})).sort((a,b)=>a.m-b.m).slice(0,n);}
+// Walking time: straight line x1.3 for street detours, 80 m per minute
+const walkMin=m=>Math.max(2,Math.round(m*1.3/80));
+const dayKey=d=>d.toLocaleDateString("en-CA",{timeZone:"Asia/Singapore"});
+const fmt=d=>d?d.toLocaleString("en-SG",{timeZone:"Asia/Singapore",weekday:"short",day:"numeric",month:"short",year:"numeric",hour:"numeric",minute:"2-digit"}):"Not set";
+const fmtT=d=>d.toLocaleTimeString("en-SG",{timeZone:"Asia/Singapore",hour:"numeric",minute:"2-digit"});
+
+function parseICS(text){
+  const lines=text.replace(/\r\n/g,"\n").replace(/\n[ \t]/g,"").split("\n");
+  const out=[];let ev=null;
+  const unesc=v=>v.replace(/\\n/gi," ").replace(/\\,/g,",").replace(/\\;/g,";").replace(/\\\\/g,"\\").trim();
+  for(const ln of lines){
+    if(ln==="BEGIN:VEVENT"){ev={};continue;}
+    if(ln==="END:VEVENT"){if(ev) out.push(ev);ev=null;continue;}
+    if(!ev) continue;
+    const i=ln.indexOf(":");if(i<0) continue;
+    const [name,...params]=ln.slice(0,i).split(";");const val=ln.slice(i+1);
+    if(name==="SUMMARY") ev.title=unesc(val);
+    else if(name==="LOCATION") ev.loc=unesc(val);
+    else if(name==="URL") ev.url=val.trim();
+    else if(name==="DTSTART") ev.start=parseDT(val,params);
+    else if(name==="DESCRIPTION"&&!ev.url){const m=unesc(val).match(/https?:\/\/(?:lu\.ma|luma\.com)\/\S+/);if(m) ev.url=m[0];}
+  }
+  return out.filter(e=>e.start);
+}
+function parseDT(v,params){
+  const m=v.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?(Z)?)?/);if(!m) return null;
+  const [,Y,M,D,h="0",mi="0",,z]=m;
+  // UTC if Z; otherwise treat as Singapore time (UTC+8)
+  return new Date(Date.UTC(+Y,+M-1,+D,+h-(z?0:8),+mi));
+}
+// ---------- calendar ----------
+function nextEvent(){const today=dayKey(new Date());return events.find(e=>dayKey(e.start)>=today)||events.at(-1);}
+function loadEvents(list){
+  if(!list.length){$("calstatus").textContent="No events found in that calendar file. Showing what was loaded before.";return;}
+  events=list.slice().sort((a,b)=>a.start-b.start);
+  const e=nextEvent();current=e;goToDay(dayKey(e.start));showEvent();
+}
+function goToDay(k){selDay=k;const [y,m]=k.split("-").map(Number);view={y,m:m-1};renderCal();}
+function renderCal(){
+  const {y,m}=view, today=dayKey(new Date());
+  $("calmonth").textContent=new Date(Date.UTC(y,m,1)).toLocaleString("en-SG",{month:"long",year:"numeric",timeZone:"UTC"});
+  const counts={};events.forEach(e=>{const k=dayKey(e.start);counts[k]=(counts[k]||0)+1;});
+  const lead=(new Date(Date.UTC(y,m,1)).getUTCDay()+6)%7, days=new Date(Date.UTC(y,m+1,0)).getUTCDate();
+  let h=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d=>'<div class="dow">'+d+'</div>').join("")+"<div></div>".repeat(lead);
+  for(let d=1;d<=days;d++){
+    const k=y+"-"+String(m+1).padStart(2,"0")+"-"+String(d).padStart(2,"0"), n=counts[k]||0;
+    const cls=["day",n?"has":"",k<today?"past":"",k===today?"today":""].join(" ");
+    const label=new Date(Date.UTC(y,m,d)).toLocaleDateString("en-SG",{weekday:"long",day:"numeric",month:"long",timeZone:"UTC"})+(n?", "+n+" event"+(n>1?"s":""):", no events");
+    h+='<button type="button" class="'+cls+'" data-k="'+k+'" aria-pressed="'+(k===selDay)+'" aria-label="'+label+'">'+d+
+       '<span class="dots">'+"<i></i>".repeat(Math.min(n,3))+'</span></button>';
+  }
+  $("calgrid").innerHTML=h;
+  $("calgrid").querySelectorAll(".day").forEach(b=>b.onclick=()=>{selDay=b.dataset.k;renderCal();});
+  const inMonth=events.filter(e=>dayKey(e.start).startsWith(y+"-"+String(m+1).padStart(2,"0"))).length;
+  $("calstatus").textContent=inMonth+" event"+(inMonth===1?"":"s")+" this month. Tap a date to see its events.";
+  renderDay();
+}
+function renderDay(){
+  const box=$("daylist"), list=events.filter(e=>dayKey(e.start)===selDay);
+  const label=selDay?new Date(selDay+"T00:00:00Z").toLocaleDateString("en-SG",{weekday:"short",day:"numeric",month:"short",timeZone:"UTC"}):"";
+  box.innerHTML='<h2>'+esc(label)+' · '+(list.length?list.length+" event"+(list.length>1?"s":""):"no events")+'</h2>';
+  if(!list.length){box.insertAdjacentHTML("beforeend",'<p class="hint">Nothing on this day. Pick a date with a dot.</p>');return;}
+  list.forEach(e=>{const b=document.createElement("button");b.type="button";b.setAttribute("aria-pressed",e===current);
+    b.innerHTML='<span class="t"></span> <strong></strong><br><span class="small"></span>';
+    b.querySelector(".t").textContent=fmtT(e.start);b.querySelector("strong").textContent=e.title||"Untitled";b.querySelector(".small").textContent=e.loc||"No venue listed";
+    b.onclick=()=>{current=e;renderDay();showEvent();$("ev-title").scrollIntoView({block:"nearest",behavior:"smooth"});};box.append(b);});
+}
+function guessStation(loc){
+  if(!loc) return "";const t=loc.toLowerCase();
+  for(const [k,v] of Object.entries(LANDMARKS)) if(t.includes(k)) return v;
+  const hit=[...STATIONS].sort((a,b)=>b.length-a.length).find(s=>new RegExp("\\b"+s.toLowerCase().replace(/[-]/g,"[- ]")+"\\b").test(t));
+  return hit||"";
+}
+function showEvent(){
+  const e=current;$("ev-title").textContent=e.title||"Untitled event";
+  $("ev-tag").textContent=e.src==="sg"?"Luma Singapore":"Loaded";$("ev-when").textContent=fmt(e.start);
+  $("ev-loc").textContent=e.loc||(e.approx?"Exact address shown on Luma after you register. Area only.":"No venue listed");
+  if(e.ll){const near=nearestStations(e.ll);$("to").value=near[0].s;
+    $("tohint").textContent="Nearest to the event"+(e.approx?" area":"")+": "+near.map(x=>x.s+" (~"+Math.round(x.m/10)*10+" m)").join(", ")+". Distances are straight-line.";}
+  else if(guessStation(e.loc)){const g=guessStation(e.loc);$("to").value=g;$("tohint").textContent="Matched \""+g+"\" from the venue text. Change it if that's wrong.";}
+  else{$("to").value="";$("tohint").textContent="Couldn't match a station from the venue text. Pick the closest one.";}
+  render();
+}
+
+// ---------- render route ----------
+function mapsLink(origin,dest,mode){return "https://www.google.com/maps/dir/?api=1&origin="+encodeURIComponent(origin)+"&destination="+encodeURIComponent(dest)+"&travelmode="+mode;}
+function render(){
+  const from=$("from").value,to=$("to").value,box=$("route");
+  try{localStorage.setItem("lm-from",from);}catch(_){}
+  if(!from||!to){box.innerHTML='<p class="hint">Choose a starting station and the station nearest the venue to see the route.</p>';return;}
+  const venue=current&&current.loc?current.loc:current&&current.ll?current.ll.join(","):to+" MRT Station, Singapore";
+  const r=route(from,to);
+  const walk=current&&current.ll&&STN_XY[to]?walkMin(metres(current.ll,STN_XY[to])):10, buffer=5;
+  let html="";
+  if(!r){html+='<p class="note">You\'re already at the station nearest the venue. Just walk the last stretch.</p>';}
+  const ride=r?r.mins:0, total=ride+walk;
+  html+='<div class="summary"><div><div class="big">~'+total+' min</div><div class="small">'+ride+' min on trains + ~'+walk+' min walk (estimate)</div></div>';
+  if(current&&current.start){const leave=new Date(current.start.getTime()-(total+buffer)*60e3);
+    html+='<div><div class="big">'+fmtT(leave)+'</div><div class="small">Leave '+esc(from)+' by this time ('+buffer+' min buffer)</div></div>';}
+  html+='</div><ol class="strip">';
+  if(r){
+    r.legs.forEach((l,i)=>{const L=LINES[l.line],col="var("+L.c+")";
+      html+='<li style="--c:'+col+'"><span class="dot"></span><div class="stn">'+esc(l.stops[0])+'</div>'+
+        '<div><span class="pill" style="--c:'+col+'">'+SHORT[l.line]+'</span>'+(i===0?"Board the ":"Change to the ")+esc(L.n)+' towards <strong>'+esc(l.toward)+'</strong></div>'+
+        '<div class="small">Ride '+l.n+' stop'+(l.n>1?"s":"")+(i<r.legs.length-1?', alight at '+esc(l.stops.at(-1))+' to change lines':', alight at '+esc(l.stops.at(-1)))+'</div></li>';});
+    const last=r.legs.at(-1);
+    html+='<li class="dash"><span class="dot" style="--c:var(--walk)"></span><div class="stn">'+esc(to)+' · alight here</div><div class="small">Follow exit signs toward the venue. Check the station exit map for the closest exit.</div></li>';
+  }
+  html+='<li><span class="dot" style="--c:var(--fg)"></span><div class="stn">'+esc(current&&current.title?current.title:"Venue")+'</div><div class="small">'+esc(current&&current.approx?"Event area (exact address after registering)":venue)+'</div></li></ol>';
+  html+='<div class="links">'+
+   '<a target="_blank" rel="noopener" href="'+mapsLink(to+" MRT Station, Singapore",venue,"walking")+'">Walking directions from '+esc(to)+'</a>'+
+   // Zoom 18 around the station frames roughly 300 m either side on a laptop screen
+   (STN_XY[to]?'<a target="_blank" rel="noopener" href="https://www.google.com/maps/search/restaurants+cafes/@'+STN_XY[to][0]+','+STN_XY[to][1]+',18z">Food &amp; drinks within ~300 m of '+esc(to)+'</a>':"")+
+   '<a target="_blank" rel="noopener" href="'+mapsLink(from+" MRT Station, Singapore",venue,"transit")+'">Full trip in Google Maps</a>'+
+   '<a target="_blank" rel="noopener" href="https://www.onemap.gov.sg/">OneMap</a>'+
+   (current&&current.url?'<a target="_blank" rel="noopener" href="'+esc(current.url)+'">Luma event page</a>':"")+'</div>';
+  if(r&&r.legs.length>1) html+='<p class="hint">Interchange'+(r.legs.length>2?"s":"")+': '+r.legs.slice(0,-1).map(l=>esc(l.stops.at(-1))).join(", ")+'.</p>';
+  box.innerHTML=html;
+}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+
+// ---------- wiring ----------
+for(const id of ["from","to"]){const sel=$(id);sel.innerHTML='<option value="">Select a station</option>'+STATIONS.map(s=>'<option>'+esc(s)+'</option>').join("");sel.onchange=render;}
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x===b));
+  document.querySelectorAll("[data-pane]").forEach(p=>p.hidden=p.dataset.pane!==b.dataset.tab);});
+$("icsfile").onchange=e=>{const f=e.target.files[0];if(!f) return;const rd=new FileReader();rd.onload=()=>loadEvents(parseICS(rd.result));rd.readAsText(f);};
+$("icsparse").onclick=()=>loadEvents(parseICS($("icstext").value));
+$("evurl").oninput=e=>{eventUrl=e.target.value.trim();if(current&&!current.sample) {current.url=eventUrl;render();}};
+$("m-use").onclick=()=>{const d=$("m-date").value,t=$("m-time").value||"19:00";
+  const start=d?parseDT(d.replace(/-/g,"")+"T"+t.replace(":","")+"00",[]):null;
+  if(!start){$("m-date").focus();return;}
+  current={title:$("m-title").value||"My event",start,loc:$("m-loc").value,url:eventUrl};
+  events=events.filter(e=>e.src!=="sg").concat(current).sort((a,b)=>a.start-b.start);goToDay(dayKey(start));showEvent();};
+$("calprev").onclick=()=>{view=view.m?{y:view.y,m:view.m-1}:{y:view.y-1,m:11};renderCal();};
+$("calnext").onclick=()=>{view=view.m<11?{y:view.y,m:view.m+1}:{y:view.y+1,m:0};renderCal();};
+$("calnextev").onclick=()=>{const e=nextEvent();if(!e) return;current=e;goToDay(dayKey(e.start));showEvent();};
+let saved="";try{saved=localStorage.getItem("lm-from")||"";}catch(_){}
+$("from").value=saved&&byStation.has(saved)?saved:"Tampines";
+$("sgmeta").textContent=SG_EVENTS.length+" public events from luma.com/discover/singapore, copied into this page on "+fmt(new Date(LUMA_SNAPSHOT.fetched))+
+  ". This page can't reach Luma by itself, so the list doesn't refresh. Ask Claude to refresh it, or the full app updates it on its server.";
+$("sgload").onclick=()=>loadEvents(SG_EVENTS);
+loadEvents(SG_EVENTS);
+</script>
+<script>
+if("serviceWorker" in navigator) addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+</script>
+</body>
+</html>
