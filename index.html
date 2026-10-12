@@ -21,11 +21,13 @@
   --bg:#f3f5f7; --panel:#ffffff; --fg:#14202b; --muted:#5b6b78; --line:#d6dde3; --accent:#0b5fae; --warn:#a15c00;
   --ns:#d42e12; --ew:#009645; --cc:#fa9e0d; --ne:#9900aa; --dt:#005ec4; --te:#9d5b25; --walk:#7b8a96;
   --onaccent:#ffffff; --food:#b4471a;
+  /* Section washes, tinted from MRT line colours: Downtown blue, East-West green, North East purple */
+  --g-event:#d3e4fa; --g-trip:#d2efdd; --g-route:#ead8f3;
   --display:"Overpass",system-ui,sans-serif; --body:"Overpass",system-ui,sans-serif; --mono:"Overpass Mono",ui-monospace,monospace;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0f151b; --panel:#17212a; --fg:#e7edf2; --muted:#9aaab6; --line:#2a3743; --accent:#6cb2f5; --warn:#f0b35c; --walk:#8c9aa5; --onaccent:#0f151b; --food:#f2955f; color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#0f151b; --panel:#17212a; --fg:#e7edf2; --muted:#9aaab6; --line:#2a3743; --accent:#6cb2f5; --warn:#f0b35c; --walk:#8c9aa5; --onaccent:#0f151b; --food:#f2955f; color-scheme:dark}
+  --bg:#0f151b; --panel:#17212a; --fg:#e7edf2; --muted:#9aaab6; --line:#2a3743; --accent:#6cb2f5; --warn:#f0b35c; --walk:#8c9aa5; --onaccent:#0f151b; --food:#f2955f; --g-event:#1b3a60; --g-trip:#183f2b; --g-route:#3a2350; color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f151b; --panel:#17212a; --fg:#e7edf2; --muted:#9aaab6; --line:#2a3743; --accent:#6cb2f5; --warn:#f0b35c; --walk:#8c9aa5; --onaccent:#0f151b; --food:#f2955f; --g-event:#1b3a60; --g-trip:#183f2b; --g-route:#3a2350; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5;padding:0 16px}
 .wrap{max-width:1080px;margin:0 auto;padding-block:28px 56px}
@@ -36,6 +38,12 @@ h1{font-family:var(--display);font-weight:800;font-size:clamp(26px,4vw,36px);mar
 .grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:20px;align-items:start}
 @media (max-width:820px){.grid{grid-template-columns:1fr}}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.sec-event{background:linear-gradient(165deg,var(--g-event) 0%,var(--panel) 100%)}
+.sec-trip{background:linear-gradient(165deg,var(--g-trip) 0%,var(--panel) 100%)}
+.sec-route{background:linear-gradient(165deg,var(--g-route) 0%,var(--panel) 100%)}
+.updated{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:0;padding:12px 14px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-variant-numeric:tabular-nums}
+.updated dt{color:var(--muted)}.updated dd{margin:0;font-weight:700}
 h2{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0;font-weight:600}
 h3{margin:0;font-size:20px;font-weight:800;text-wrap:balance}
 label{font-size:13px;font-weight:600;display:block;margin-bottom:4px}
@@ -68,6 +76,20 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .evlist{display:flex;flex-direction:column;gap:6px}
 .evlist button,.evlist a{display:block;text-align:left;font:inherit;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;cursor:pointer;text-decoration:none}
 .evlist button[aria-pressed="true"],.evlist a[aria-current="true"]{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.pagetabs{display:flex;gap:4px;margin:-10px 0 20px;border-bottom:1px solid var(--line)}
+.pagetabs button{font:inherit;font-weight:700;font-size:14px;background:none;border:0;border-bottom:3px solid transparent;color:var(--muted);padding:10px 12px;margin-bottom:-1px;cursor:pointer}
+.pagetabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent)}
+.about p,.about li{max-width:68ch}
+.about h3{font-size:17px;margin:4px 0 8px}
+.about .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+.about ol,.about ul{padding-left:20px;margin:0 0 12px;display:flex;flex-direction:column;gap:6px}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.st{display:inline-block;font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.st.on{color:var(--ew)}.st.plan{color:var(--warn)}.st.no{color:var(--muted)}
+.walkline{display:flex;align-items:center;gap:6px;font-weight:700;margin-top:4px}
 .steps{margin:0 0 10px;padding-left:20px;display:flex;flex-direction:column;gap:4px;font-size:14px;max-width:62ch}
 .linkbtn{font:inherit;font-weight:600;color:var(--accent);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
 .ext{float:right;margin-left:8px;font-size:12px;font-weight:700;color:var(--accent);white-space:nowrap}
@@ -116,8 +138,12 @@ code{font-family:var(--mono);font-size:13px}
     <h1>Luma to MRT</h1>
     <p class="sub">Load your next Luma event, pick the MRT station you're starting from, and get the lines, interchanges and stop to alight at. Nothing leaves this page.</p>
   </div>
-  <span class="tag">Prototype</span>
 </header>
+
+<nav class="pagetabs" role="tablist" aria-label="Sections">
+  <button type="button" role="tab" id="pt-trip" aria-selected="true" aria-controls="page-trip" data-page="trip">Plan a trip</button>
+  <button type="button" role="tab" id="pt-about" aria-selected="false" aria-controls="page-about" data-page="about">About this app</button>
+</nav>
 
 <section class="install" id="install" aria-labelledby="install-h" hidden>
   <h2 id="install-h">Install the app on your phone</h2>
@@ -146,8 +172,10 @@ code{font-family:var(--mono);font-size:13px}
   <div><span>A new version of the app is available.</span><button type="button" id="update-btn">Refresh</button></div>
 </div>
 
+<div id="page-trip" role="tabpanel" aria-labelledby="pt-trip">
 <div class="grid">
-<section class="panel" aria-labelledby="ev-h">
+<div class="stack">
+<section class="panel sec-event" aria-labelledby="ev-h">
   <h2 id="ev-h">1 · Your event</h2>
   <div class="tabs" role="tablist">
     <button role="tab" id="t-sg" aria-selected="true" data-tab="sg">Luma Singapore</button>
@@ -217,17 +245,75 @@ code{font-family:var(--mono);font-size:13px}
     </dl>
   </div>
 
-  <h2 style="margin-top:6px">2 · Your trip</h2>
+  </section>
+
+<section class="panel sec-trip" aria-labelledby="tr-h">
+  <h2 id="tr-h">2 · Your trip</h2>
   <div class="row">
     <div><label for="from">Starting station</label><select id="from"></select></div>
     <div><label for="to">Station nearest the venue</label><select id="to"></select></div>
   </div>
   <p class="hint" id="tohint"></p>
 </section>
+</div>
 
-<section class="panel" aria-labelledby="rt-h" aria-live="polite">
+<section class="panel sec-route" aria-labelledby="rt-h" aria-live="polite">
   <h2 id="rt-h">3 · Your route</h2>
   <div id="route"></div>
+</section>
+</div>
+</div>
+
+<div id="page-about" role="tabpanel" aria-labelledby="pt-about" hidden>
+<section class="panel about">
+  <h2>About this app</h2>
+  <dl class="updated">
+    <dt>App last updated</dt><dd id="app-updated"></dd>
+    <dt>Event list last updated</dt><dd id="list-updated"></dd>
+  </dl>
+  <p>Luma to MRT shows upcoming public Luma events in Singapore on a calendar. Pick an event and the MRT station you're starting from, and it gives you the lines, interchanges, the stop to get off at, the walk to the venue and when to leave.</p>
+
+  <div class="cols">
+    <div>
+      <h3>Where event data comes from</h3>
+      <div class="tbl"><table>
+        <tr><th>Source</th><th>Status</th><th>Notes</th></tr>
+        <tr><td>Luma Singapore list (luma.com/discover/singapore)</td><td><span class="st on">In use</span></td><td>Public events, no login. Fetched every 3 hours. Luma hides some addresses in this list until you register.</td></tr>
+        <tr><td>My registration (.ics file)</td><td><span class="st on">In use</span></td><td>Adds the address of an event you registered for. Saved on your device only.</td></tr>
+        <tr><td>Event link / type it in</td><td><span class="st on">In use</span></td><td>For events not in the Singapore list.</td></tr>
+        <tr><td>Luma iCal subscription</td><td><span class="st plan">Planned</span></td><td>Would add all your registrations automatically. Needs a small proxy server, and the private link must stay on your device.</td></tr>
+        <tr><td>Luma API</td><td><span class="st no">Not used</span></td><td>For event hosts only: needs Luma Plus and a key for a calendar you manage. It can't list events you're attending.</td></tr>
+      </table></div>
+    </div>
+    <div>
+      <h3>How it works</h3>
+      <ol>
+        <li>A GitHub Action fetches Luma's Singapore events every 3 hours and publishes them with the app on GitHub Pages. Luma blocks browsers from reading the list directly.</li>
+        <li>The app loads that list when it opens and when you tap <strong>Refresh events</strong>.</li>
+        <li>Each event's map location gives the nearest MRT stations. A registered address replaces the approximate area.</li>
+        <li>The route is worked out on the MRT network built into the app: about 2.3 minutes per stop and 5 minutes per change of line.</li>
+        <li>Walking time is the straight-line distance plus 30% for streets, at 80 m a minute.</li>
+        <li>The app works offline once opened, and tells you when a new version is available.</li>
+      </ol>
+    </div>
+    <div>
+      <h3>What's next</h3>
+      <ul>
+        <li>Suggest the starting station from your phone's location, only after you allow it.</li>
+        <li>Walking routes and the best station exit from OneMap.</li>
+        <li>Train disruption alerts from LTA DataMall, shown above the route.</li>
+        <li>Connect your Luma iCal subscription so registered addresses fill in automatically.</li>
+        <li>A reminder at your "leave by" time.</li>
+      </ul>
+      <h3>Limits</h3>
+      <ul>
+        <li>Covers the six MRT lines. No LRT, and Circle Line Stage 6 isn't included yet.</li>
+        <li>Travel and walking times are estimates. Check the map links before you go.</li>
+        <li>Luma's event list isn't an official API and could change without notice.</li>
+      </ul>
+      <p class="hint">Station locations: sgraildata (open data). Events: Luma. Maps: Google Maps and OneMap.</p>
+    </div>
+  </div>
 </section>
 </div>
 
@@ -414,9 +500,14 @@ function render(){
   if(!from||!to){box.innerHTML='<p class="hint">Choose a starting station and the station nearest the venue to see the route.</p>';return;}
   const venue=current&&current.loc?current.loc:current&&current.ll?current.ll.join(","):to+" MRT Station, Singapore";
   const r=route(from,to);
-  const walk=current&&current.ll&&STN_XY[to]?walkMin(metres(current.ll,STN_XY[to])):10, buffer=5;
+  // Walk from the alighting station: straight line x1.3 for streets; 10 min guess when the venue's location is unknown
+  const wm=current&&current.ll&&STN_XY[to]?metres(current.ll,STN_XY[to]):null;
+  const walk=wm!=null?walkMin(wm):10, buffer=5;
+  const walkLine='<div class="walkline"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="13" cy="4" r="1.6"/><path d="M9 21l2.5-6.5L14 17v4M7 11.5l3-3.5 3.5 1 2 3.5 2.5 1M11.5 14.5l1-5.5"/></svg>'+
+    '~'+walk+' min walk'+(wm!=null?' (about '+Math.max(50,Math.round(wm*1.3/50)*50)+' m)':'')+' to '+(current&&current.approx?'the event area':'the event')+'</div>'+
+    (wm==null?'<div class="small">Estimate: the venue\'s exact location isn\'t known.</div>':'');
   let html="";
-  if(!r){html+='<p class="note">You\'re already at the station nearest the venue. Just walk the last stretch.</p>';}
+  if(!r){html+='<p class="note">You\'re already at the station nearest the venue. Just walk the last stretch.</p>'+walkLine;}
   const ride=r?r.mins:0, total=ride+walk;
   html+='<div class="summary"><div><div class="big">~'+total+' min</div><div class="small">'+ride+' min on trains + ~'+walk+' min walk (estimate)</div></div>';
   if(current&&current.start){const leave=new Date(current.start.getTime()-(total+buffer)*60e3);
@@ -428,7 +519,7 @@ function render(){
         '<div><span class="pill" style="--c:'+col+'">'+SHORT[l.line]+'</span>'+(i===0?"Board the ":"Change to the ")+esc(L.n)+' towards <strong>'+esc(l.toward)+'</strong></div>'+
         '<div class="small">Ride '+l.n+' stop'+(l.n>1?"s":"")+(i<r.legs.length-1?', alight at '+esc(l.stops.at(-1))+' to change lines':', alight at '+esc(l.stops.at(-1)))+'</div></li>';});
     const last=r.legs.at(-1);
-    html+='<li class="dash"><span class="dot" style="--c:var(--walk)"></span><div class="stn">'+esc(to)+' · alight here</div><div class="small">Follow exit signs toward the venue. Check the station exit map for the closest exit.</div>'+foodButton(to)+'</li>';
+    html+='<li class="dash"><span class="dot" style="--c:var(--walk)"></span><div class="stn">'+esc(to)+' · alight here</div>'+walkLine+'<div class="small">Follow exit signs toward the venue. Check the station exit map for the closest exit.</div>'+foodButton(to)+'</li>';
   }
   html+='<li><span class="dot" style="--c:var(--fg)"></span><div class="stn">'+esc(current&&current.title?current.title:"Venue")+'</div><div class="small">'+esc(current&&current.approx?"Event area (address hidden in Luma's public list)":venue)+'</div>'+(r?"":foodButton(to))+'</li></ol>';
   html+='<div class="links">'+
@@ -453,6 +544,12 @@ for(const id of ["from","to"]){const sel=$(id);sel.innerHTML='<option value="">S
 function goTab(name){document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x.dataset.tab===name));
   document.querySelectorAll("[data-pane]").forEach(p=>p.hidden=p.dataset.pane!==name);}
 document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>goTab(b.dataset.tab));
+// Top-level sections; #about links straight to the About tab
+function goPage(name){document.querySelectorAll(".pagetabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.page===name));
+  $("page-trip").hidden=name!=="trip";$("page-about").hidden=name!=="about";}
+document.querySelectorAll(".pagetabs button").forEach(b=>b.onclick=()=>{goPage(b.dataset.page);
+  history.replaceState(null,"",b.dataset.page==="about"?"#about":location.pathname);});
+if(location.hash==="#about") goPage("about");
 // Adds addresses from the user's calendar file to matching events instead of replacing the calendar
 function importICS(text){
   const list=parseICS(text), st=$("icsstate");
@@ -487,7 +584,13 @@ $("calnext").onclick=()=>{view=view.m<11?{y:view.y,m:view.m+1}:{y:view.y+1,m:0};
 $("calnextev").onclick=()=>{const e=nextEvent();if(!e) return;current=e;goToDay(dayKey(e.start));showEvent();};
 let saved="";try{saved=localStorage.getItem("lm-from")||"";}catch(_){}
 $("from").value=saved&&byStation.has(saved)?saved:"Tampines";
-function sgMeta(){$("sgmeta").textContent=SG_EVENTS.length+" upcoming public events from luma.com/discover/singapore. List fetched from Luma on "+fmt(new Date(sgFetched))+
+// UK date and time format (dd/mm/yyyy, 24-hour), shown in Singapore time
+const fmtUK=d=>d.toLocaleString("en-GB",{timeZone:"Asia/Singapore",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",hour12:false})+" (Singapore time)";
+// The deploy workflow swaps this placeholder for the time of the latest code change
+const BUILT_AT="__BUILT_AT__";
+$("app-updated").textContent=BUILT_AT.startsWith("__")?fmtUK(new Date(document.lastModified))+" · local preview":fmtUK(new Date(BUILT_AT));
+function sgMeta(){
+  $("list-updated").textContent=fmtUK(new Date(sgFetched));$("sgmeta").textContent=SG_EVENTS.length+" upcoming public events from luma.com/discover/singapore. List fetched from Luma on "+fmt(new Date(sgFetched))+
   ". The app's server fetches a new list every 3 hours.";}
 // Rebuilds the calendar: Luma Singapore events (with any registered addresses) plus the user's own events
 function showSg(keep){

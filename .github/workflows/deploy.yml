@@ -35,6 +35,8 @@ jobs:
           cp -r index.html manifest.webmanifest sw.js icons events.json .nojekyll _site/
           # Stamp the app version so open apps can tell a new version is out
           sed -i "s/__BUILD__/${GITHUB_SHA::7}/" _site/sw.js
+          # Show when the app's code last changed on the About page
+          sed -i "s/__BUILT_AT__/$(git log -1 --format=%cI)/" _site/index.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
