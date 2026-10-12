@@ -1,6 +1,6 @@
 // The deploy workflow replaces __BUILD__ with the commit id, so every push is a new version
 const VERSION="luma-mrt-__BUILD__";
-const SHELL=["./","index.html","manifest.webmanifest","icons/icon-192.png","icons/icon-512.png","icons/apple-touch-icon.png"];
+const SHELL=["./","index.html","manifest.webmanifest","icons/icon-192.png","icons/icon-512.png","icons/icon-maskable-512.png","icons/apple-touch-icon.png"];
 // A new version waits until the user taps Refresh in the app (see "skipWaiting" message below)
 self.addEventListener("install",e=>{e.waitUntil(caches.open(VERSION).then(c=>c.addAll(SHELL.map(u=>new Request(u,{cache:"reload"})))));});
 self.addEventListener("message",e=>{if(e.data==="skipWaiting") self.skipWaiting();});
