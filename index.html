@@ -462,7 +462,9 @@ function importICS(text){
   for(const p of list){
     const match=all.find(e=>sameEvent(e,p));
     if(p.loc){
-      if(match&&match.src==="sg"){for(const k of new Set([...keysOf(p),...keysOf(match)])) REG[k]={loc:p.loc,ll:p.ll||null};}
+      // Coordinates identical to the public list's are the approximate area, not the venue
+      const exact=p.ll&&!(match&&match.ll&&metres(p.ll,match.ll)<5)?p.ll:null;
+      if(match&&match.src==="sg"){for(const k of new Set([...keysOf(p),...keysOf(match)])) REG[k]={loc:p.loc,ll:exact};}
       else{extraEvents=extraEvents.filter(x=>!sameEvent(x,p)).concat({...p,approx:false,registered:true,src:"ics"});}
       added.push(p.title||"Untitled");first=first||p;
     }else{hidden++;if(!match) extraEvents.push({...p,approx:true,src:"ics"});first=first||p;}
