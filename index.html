@@ -655,7 +655,12 @@ if("serviceWorker" in navigator){
     // Only offer an update when an older version is already running this page
     const offer=w=>{if(!w||!navigator.serviceWorker.controller) return;
       bar.hidden=false;
-      document.getElementById("update-btn").onclick=()=>{updating=true;w.postMessage("skipWaiting");};};
+      // Check once more first, so a user who skipped several versions jumps straight to the newest
+      document.getElementById("update-btn").onclick=async()=>{updating=true;
+        try{await reg.update();}catch(_){}
+        const inst=reg.installing;
+        if(inst) await new Promise(r=>{const done=()=>{if(inst.state!=="installing") r();};inst.addEventListener("statechange",done);done();});
+        (reg.waiting||w).postMessage("skipWaiting");};};
     if(reg.waiting) offer(reg.waiting);
     reg.addEventListener("updatefound",()=>{const w=reg.installing;if(!w) return;
       w.addEventListener("statechange",()=>{if(w.state==="installed") offer(w);});});

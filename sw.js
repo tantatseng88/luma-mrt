@@ -14,7 +14,8 @@ self.addEventListener("fetch",e=>{
   const req=e.request,url=new URL(req.url);
   if(req.method!=="GET") return;
   // Pages and the event list: always try for the latest
-  if(req.mode==="navigate"){e.respondWith(networkFirst(req,"index.html"));return;}
+  // Skip the browser's HTTP cache (GitHub Pages allows 10 minutes) so a new version shows straight away
+  if(req.mode==="navigate"){e.respondWith(networkFirst(new Request(req.url,{cache:"no-cache",credentials:"same-origin"}),"index.html"));return;}
   if(url.origin===location.origin&&url.pathname.endsWith("/events.json")){e.respondWith(networkFirst(req,"events.json"));return;}
   // App files and Google Fonts: serve from cache, refresh in the background
   if(url.origin===location.origin||/fonts\.(googleapis|gstatic)\.com$/.test(url.hostname)){
