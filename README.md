@@ -23,13 +23,24 @@ Then open http://localhost:8765. Service workers only run on `localhost` or `htt
 ## Deploy to GitHub Pages
 
 1. Push this folder to a GitHub repository.
-2. In the repository, open **Settings → Pages**, set **Source** to "Deploy from a branch", branch `main`, folder `/ (root)`.
-3. The app is served at `https://<username>.github.io/<repo>/`. Open it on your phone and choose **Add to Home Screen** (iOS Safari) or **Install app** (Android Chrome).
+2. In the repository, open **Settings → Pages** and set **Source** to **GitHub Actions**.
+3. `.github/workflows/deploy.yml` deploys on every push to `main`, every 3 hours, and when you press **Run workflow** on the Actions tab.
+4. The app is served at `https://<username>.github.io/<repo>/`. Open it on your phone and choose **Add to Home Screen** (iOS Safari) or **Install app** (Android Chrome).
 
-## Updating
+## How event refresh works
 
-- The event list is a snapshot copied into `index.html`; it does not refresh by itself. Replace the `LUMA_SNAPSHOT` data to update it.
-- After any change to `index.html`, bump `VERSION` in `sw.js` (for example `luma-mrt-v2`) so installed copies pick up the new version.
+Luma's feed doesn't allow requests from other websites, so the app can't call Luma directly. Instead:
+
+1. Every 3 hours the workflow runs `scripts/fetch-events.mjs`, which fetches the Singapore list and writes `events.json` into the deployed site. If Luma returns nothing or an error, the run fails and the previous list stays live.
+2. The app loads `events.json` when it opens and when you tap **Refresh events**. Offline, it uses the last list it saved, or the list built into `index.html`.
+
+To get a fresh list sooner than 3 hours, open the repository's **Actions** tab, choose the workflow and press **Run workflow**.
+
+GitHub pauses scheduled workflows in public repositories after 60 days without commits. If the list stops updating, re-enable the workflow on the Actions tab.
+
+## Updating the app
+
+After any change to `index.html`, bump `VERSION` in `sw.js` so installed copies pick up the new version.
 
 ## Data sources
 

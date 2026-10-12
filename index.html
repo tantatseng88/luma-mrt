@@ -20,12 +20,12 @@
 :root{
   --bg:#f3f5f7; --panel:#ffffff; --fg:#14202b; --muted:#5b6b78; --line:#d6dde3; --accent:#0b5fae; --warn:#a15c00;
   --ns:#d42e12; --ew:#009645; --cc:#fa9e0d; --ne:#9900aa; --dt:#005ec4; --te:#9d5b25; --walk:#7b8a96;
-  --onaccent:#ffffff;
+  --onaccent:#ffffff; --food:#b4471a;
   --display:"Overpass",system-ui,sans-serif; --body:"Overpass",system-ui,sans-serif; --mono:"Overpass Mono",ui-monospace,monospace;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0f151b; --panel:#17212a; --fg:#e7edf2; --muted:#9aaab6; --line:#2a3743; --accent:#6cb2f5; --warn:#f0b35c; --walk:#8c9aa5; --onaccent:#0f151b; color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#0f151b; --panel:#17212a; --fg:#e7edf2; --muted:#9aaab6; --line:#2a3743; --accent:#6cb2f5; --warn:#f0b35c; --walk:#8c9aa5; --onaccent:#0f151b; color-scheme:dark}
+  --bg:#0f151b; --panel:#17212a; --fg:#e7edf2; --muted:#9aaab6; --line:#2a3743; --accent:#6cb2f5; --warn:#f0b35c; --walk:#8c9aa5; --onaccent:#0f151b; --food:#f2955f; color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f151b; --panel:#17212a; --fg:#e7edf2; --muted:#9aaab6; --line:#2a3743; --accent:#6cb2f5; --warn:#f0b35c; --walk:#8c9aa5; --onaccent:#0f151b; --food:#f2955f; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5;padding:0 16px}
 .wrap{max-width:1080px;margin:0 auto;padding-block:28px 56px}
@@ -82,6 +82,12 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .stn{font-weight:800;font-size:16px}
 .pill{display:inline-block;color:#fff;font-weight:700;font-size:12px;padding:1px 8px;border-radius:4px;background:var(--c);margin-right:6px;vertical-align:1px}
 .links{display:flex;flex-wrap:wrap;gap:8px}
+.ico{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.btn{display:inline-flex;align-items:center;gap:6px}
+.btn:disabled{opacity:.6;cursor:progress}
+.refreshrow{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.food{display:inline-flex;align-items:center;gap:8px;margin-top:8px;padding:8px 14px;border-radius:999px;background:var(--food);color:var(--onaccent);font-weight:700;font-size:14px;text-decoration:none}
+.food:hover{filter:brightness(1.08)}
 .links a{color:var(--accent);font-weight:600;font-size:14px}
 details{border-top:1px solid var(--line);padding-top:12px}
 summary{cursor:pointer;font-weight:700}
@@ -118,8 +124,14 @@ code{font-family:var(--mono);font-size:13px}
   </div>
 
   <div data-pane="sg">
-    <p class="hint" id="sgmeta"></p>
-    <button class="btn" id="sgload" style="margin-top:6px">Show Luma Singapore events</button>
+    <div class="refreshrow">
+      <button class="btn primary" id="sgload" type="button">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>
+        <span id="sgloadtxt">Refresh events</span>
+      </button>
+      <span class="hint" id="sgstate" aria-live="polite"></span>
+    </div>
+    <p class="hint" id="sgmeta" style="margin-top:6px"></p>
   </div>
   <div data-pane="ics" hidden>
     <label for="icsfile">Upload an .ics file from Luma</label>
@@ -273,7 +285,9 @@ function route(from,to){
 // ---------- event handling ----------
 const $=id=>document.getElementById(id);
 let events=[], current=null, eventUrl="", view={y:0,m:0}, selDay="";
-const SG_EVENTS=LUMA_SNAPSHOT.events.map(e=>({title:e.t,start:new Date(e.s),url:e.u,ll:e.ll,loc:e.l,approx:!e.l,src:"sg"}));
+const toEvents=list=>list.map(e=>({title:e.t,start:new Date(e.s),url:e.u,ll:e.ll,loc:e.l,approx:!e.l,src:"sg"}));
+// Starts with the list built into the page; replaced by events.json, which a GitHub Action updates every 3 hours
+let SG_EVENTS=toEvents(LUMA_SNAPSHOT.events), sgFetched=LUMA_SNAPSHOT.fetched;
 // Straight-line metres between [lat,lng] pairs
 function metres(a,b){const r=Math.PI/180,x=(b[1]-a[1])*r*Math.cos((a[0]+b[0])/2*r),y=(b[0]-a[0])*r;return Math.hypot(x,y)*6371e3;}
 function nearestStations(ll,n=3){return Object.entries(STN_XY).map(([s,xy])=>({s,m:metres(ll,xy)})).sort((a,b)=>a.m-b.m).slice(0,n);}
@@ -383,18 +397,23 @@ function render(){
         '<div><span class="pill" style="--c:'+col+'">'+SHORT[l.line]+'</span>'+(i===0?"Board the ":"Change to the ")+esc(L.n)+' towards <strong>'+esc(l.toward)+'</strong></div>'+
         '<div class="small">Ride '+l.n+' stop'+(l.n>1?"s":"")+(i<r.legs.length-1?', alight at '+esc(l.stops.at(-1))+' to change lines':', alight at '+esc(l.stops.at(-1)))+'</div></li>';});
     const last=r.legs.at(-1);
-    html+='<li class="dash"><span class="dot" style="--c:var(--walk)"></span><div class="stn">'+esc(to)+' · alight here</div><div class="small">Follow exit signs toward the venue. Check the station exit map for the closest exit.</div></li>';
+    html+='<li class="dash"><span class="dot" style="--c:var(--walk)"></span><div class="stn">'+esc(to)+' · alight here</div><div class="small">Follow exit signs toward the venue. Check the station exit map for the closest exit.</div>'+foodButton(to)+'</li>';
   }
-  html+='<li><span class="dot" style="--c:var(--fg)"></span><div class="stn">'+esc(current&&current.title?current.title:"Venue")+'</div><div class="small">'+esc(current&&current.approx?"Event area (exact address after registering)":venue)+'</div></li></ol>';
+  html+='<li><span class="dot" style="--c:var(--fg)"></span><div class="stn">'+esc(current&&current.title?current.title:"Venue")+'</div><div class="small">'+esc(current&&current.approx?"Event area (exact address after registering)":venue)+'</div>'+(r?"":foodButton(to))+'</li></ol>';
   html+='<div class="links">'+
    '<a target="_blank" rel="noopener" href="'+mapsLink(to+" MRT Station, Singapore",venue,"walking")+'">Walking directions from '+esc(to)+'</a>'+
-   // Zoom 18 around the station frames roughly 300 m either side on a laptop screen
-   (STN_XY[to]?'<a target="_blank" rel="noopener" href="https://www.google.com/maps/search/restaurants+cafes/@'+STN_XY[to][0]+','+STN_XY[to][1]+',18z">Food &amp; drinks within ~300 m of '+esc(to)+'</a>':"")+
    '<a target="_blank" rel="noopener" href="'+mapsLink(from+" MRT Station, Singapore",venue,"transit")+'">Full trip in Google Maps</a>'+
    '<a target="_blank" rel="noopener" href="https://www.onemap.gov.sg/">OneMap</a>'+
    (current&&current.url?'<a target="_blank" rel="noopener" href="'+esc(current.url)+'">Luma event page</a>':"")+'</div>';
   if(r&&r.legs.length>1) html+='<p class="hint">Interchange'+(r.legs.length>2?"s":"")+': '+r.legs.slice(0,-1).map(l=>esc(l.stops.at(-1))).join(", ")+'.</p>';
   box.innerHTML=html;
+}
+// Zoom 18 around the station frames roughly 300 m either side on a laptop screen
+function foodButton(stn){
+  if(!STN_XY[stn]) return "";
+  return '<a class="food" target="_blank" rel="noopener" href="https://www.google.com/maps/search/restaurants+cafes/@'+STN_XY[stn][0]+','+STN_XY[stn][1]+',18z">'+
+    '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v8M4.5 3v5a2.5 2.5 0 0 0 5 0V3M7 11v10M17 21V3c-2.2 1.2-3.5 3.6-3.5 7v3H17"/></svg>'+
+    'Food &amp; Drink near '+esc(stn)+'</a>';
 }
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
@@ -415,10 +434,35 @@ $("calnext").onclick=()=>{view=view.m<11?{y:view.y,m:view.m+1}:{y:view.y+1,m:0};
 $("calnextev").onclick=()=>{const e=nextEvent();if(!e) return;current=e;goToDay(dayKey(e.start));showEvent();};
 let saved="";try{saved=localStorage.getItem("lm-from")||"";}catch(_){}
 $("from").value=saved&&byStation.has(saved)?saved:"Tampines";
-$("sgmeta").textContent=SG_EVENTS.length+" public events from luma.com/discover/singapore, copied into this page on "+fmt(new Date(LUMA_SNAPSHOT.fetched))+
-  ". This page can't reach Luma by itself, so the list doesn't refresh. Ask Claude to refresh it, or the full app updates it on its server.";
-$("sgload").onclick=()=>loadEvents(SG_EVENTS);
-loadEvents(SG_EVENTS);
+function sgMeta(){$("sgmeta").textContent=SG_EVENTS.length+" upcoming public events from luma.com/discover/singapore. List fetched from Luma on "+fmt(new Date(sgFetched))+
+  ". The app's server fetches a new list every 3 hours.";}
+function showSg(keepUrl){
+  loadEvents(SG_EVENTS);
+  const keep=keepUrl&&SG_EVENTS.find(e=>e.url===keepUrl);
+  if(keep){current=keep;goToDay(dayKey(keep.start));showEvent();}
+  sgMeta();
+}
+async function refreshEvents(manual){
+  const btn=$("sgload");btn.disabled=true;$("sgloadtxt").textContent="Refreshing…";$("sgstate").textContent="";
+  // Only replace the calendar if it's showing Luma Singapore events, or the user asked
+  const onSg=!events.length||events[0].src==="sg";
+  try{
+    const r=await fetch("events.json",{cache:"no-store"});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const data=await r.json();
+    if(!Array.isArray(data.events)||!data.events.length) throw new Error("empty list");
+    const before=SG_EVENTS.length;
+    SG_EVENTS=toEvents(data.events);sgFetched=data.fetched;
+    if(manual||onSg) showSg(current&&current.src==="sg"?current.url:null); else sgMeta();
+    if(manual) $("sgstate").textContent="Updated. "+SG_EVENTS.length+" events"+(SG_EVENTS.length!==before?" ("+(SG_EVENTS.length>before?"+":"")+(SG_EVENTS.length-before)+")":"")+".";
+  }catch(err){
+    if(manual){ if(onSg) showSg(current&&current.src==="sg"?current.url:null);
+      $("sgstate").textContent=navigator.onLine?"Couldn't get the latest list. Showing the saved one.":"You're offline. Showing the saved list."; }
+  }finally{btn.disabled=false;$("sgloadtxt").textContent="Refresh events";}
+}
+$("sgload").onclick=()=>refreshEvents(true);
+showSg(null);
+refreshEvents(false);
 </script>
 <script>
 if("serviceWorker" in navigator) addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
