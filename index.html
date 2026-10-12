@@ -72,10 +72,15 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .dots{display:flex;gap:2px;height:5px}.dots i{width:5px;height:5px;border-radius:50%;background:var(--accent)}
 .day[aria-pressed="true"] .dots i{background:var(--onaccent)}
 .daybar{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
-.evlist .t{font-family:var(--mono);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
-.evlist{display:flex;flex-direction:column;gap:6px}
-.evlist button,.evlist a{display:block;text-align:left;font:inherit;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;cursor:pointer;text-decoration:none}
-.evlist button[aria-pressed="true"],.evlist a[aria-current="true"]{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.evlist{display:flex;flex-direction:column;gap:10px}
+.evitem{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:14px 16px;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.evitem:hover{border-color:var(--muted)}
+.evitem[aria-current="true"]{border-color:var(--accent);box-shadow:inset 4px 0 0 var(--accent)}
+.evitem h3{font-size:21px;line-height:1.35}
+.evitem:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.evtags{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.lumalink{font-size:13px;font-weight:700;color:var(--accent);text-underline-offset:3px}
+.evitem .meta{font-size:16px;gap:6px 16px}
 .pagetabs{display:flex;gap:4px;margin:-10px 0 20px;border-bottom:1px solid var(--line)}
 .pagetabs button{font:inherit;font-weight:700;font-size:14px;background:none;border:0;border-bottom:3px solid transparent;color:var(--muted);padding:10px 12px;margin-bottom:-1px;cursor:pointer}
 .pagetabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent)}
@@ -89,12 +94,11 @@ th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertic
 th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .st{display:inline-block;font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
 .st.on{color:var(--ew)}.st.plan{color:var(--warn)}.st.no{color:var(--muted)}
+.triprow{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+#swap[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 .walkline{display:flex;align-items:center;gap:6px;font-weight:700;margin-top:4px}
 .steps{margin:0 0 10px;padding-left:20px;display:flex;flex-direction:column;gap:4px;font-size:14px;max-width:62ch}
 .linkbtn{font:inherit;font-weight:600;color:var(--accent);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
-.ext{float:right;margin-left:8px;font-size:12px;font-weight:700;color:var(--accent);white-space:nowrap}
-#ev-title a{color:inherit;text-decoration-color:var(--accent);text-underline-offset:3px}
-#ev-title a span{color:var(--accent);font-size:.8em}
 .meta{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px}.meta dt{color:var(--muted)}.meta dd{margin:0;min-width:0;overflow-wrap:anywhere}
 .tag{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
 .summary{display:flex;flex-wrap:wrap;gap:18px;align-items:baseline}
@@ -237,21 +241,22 @@ code{font-family:var(--mono);font-size:13px}
   <div class="daybar"><p class="hint" id="calstatus"></p><button type="button" class="btn" id="calnextev">Next event</button></div>
   <div id="daylist" class="evlist" aria-live="polite"></div>
 
-  <div id="evcard" style="display:flex;flex-direction:column;gap:8px">
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><h3 id="ev-title"></h3><span class="tag" id="ev-tag"></span></div>
-    <dl class="meta">
-      <dt>When</dt><dd id="ev-when"></dd>
-      <dt>Venue</dt><dd id="ev-loc"></dd>
-    </dl>
-  </div>
-
   </section>
 
 <section class="panel sec-trip" aria-labelledby="tr-h">
   <h2 id="tr-h">2 · Your trip</h2>
   <div class="row">
-    <div><label for="from">Starting station</label><select id="from"></select></div>
-    <div><label for="to">Station nearest the venue</label><select id="to"></select></div>
+    <div><label for="from" id="lbl-from">Starting Station</label><select id="from"></select></div>
+    <div><label for="to" id="lbl-to">Station nearest the venue</label><select id="to"></select></div>
+  </div>
+  <div class="triprow">
+    <button type="button" class="btn" id="swap" aria-pressed="false">
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4"/></svg>Swap
+    </button>
+    <button type="button" class="btn" id="tripreset">
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7M4 4v5h5"/></svg>Reset
+    </button>
+    <span class="hint" id="tripmode" aria-live="polite"></span>
   </div>
   <p class="hint" id="tohint"></p>
 </section>
@@ -373,7 +378,7 @@ function route(from,to){
 // ---------- event handling ----------
 const $=id=>document.getElementById(id);
 let events=[], current=null, eventUrl="", view={y:0,m:0}, selDay="";
-const toEvents=list=>list.map(e=>({id:e.i||"",title:e.t,start:new Date(e.s),url:e.u,ll:e.ll,loc:e.l,approx:!e.l,src:"sg"}));
+const toEvents=list=>list.map(e=>({id:e.i||"",title:e.t,start:new Date(e.s),end:e.e?new Date(e.e):null,url:e.u,ll:e.ll,loc:e.l,approx:!e.l,src:"sg"}));
 // Starts with the list built into the page; replaced by events.json, which a GitHub Action updates every 3 hours
 let SG_EVENTS=toEvents(LUMA_SNAPSHOT.events), sgFetched=LUMA_SNAPSHOT.fetched;
 // Events from calendar files or typed in that aren't in the Luma Singapore list
@@ -415,6 +420,7 @@ function parseICS(text){
     else if(name==="GEO"){const [a,b]=val.split(/[;,]/).map(Number);if(isFinite(a)&&isFinite(b)) ev.ll=[a,b];}
     else if(name==="URL") ev.url=val.trim();
     else if(name==="DTSTART") ev.start=parseDT(val,params);
+    else if(name==="DTEND") ev.end=parseDT(val,params);
     else if(name==="DESCRIPTION"&&!ev.url){const m=unesc(val).match(/https?:\/\/(?:lu\.ma|luma\.com)\/\S+/);if(m) ev.url=m[0];}
   }
   return out.filter(e=>e.start);
@@ -458,14 +464,24 @@ function renderDay(){
   box.innerHTML='<h2>'+esc(label)+' · '+(list.length?list.length+" event"+(list.length>1?"s":""):"no events")+'</h2>';
   if(!list.length){box.insertAdjacentHTML("beforeend",'<p class="hint">Nothing on this day. Pick a date with a dot.</p>');return;}
   list.forEach(e=>{
-    // Events with a Luma page open it in a new tab; tapping also selects the event so its route is ready on return
-    const url=safeUrl(e.url), b=document.createElement(url?"a":"button");
-    if(url){b.href=url;b.target="_blank";b.rel="noopener";b.setAttribute("aria-current",e===current);}
-    else{b.type="button";b.setAttribute("aria-pressed",e===current);}
-    b.innerHTML=(url?'<span class="ext">Luma ↗</span>':'')+'<span class="t"></span> <strong></strong><br><span class="small"></span>';
-    b.querySelector(".t").textContent=fmtT(e.start);b.querySelector("strong").textContent=e.title||"Untitled";b.querySelector(".small").textContent=(e.registered?"✓ Registered · ":"")+(e.loc||(e.approx?"Address hidden in Luma's public list. Tap to see it on Luma.":"No venue listed"));
-    if(url) b.setAttribute("aria-label",(e.title||"Untitled")+", "+fmtT(e.start)+". Opens on Luma in a new tab");
-    b.onclick=()=>{current=e;renderDay();showEvent();};box.append(b);});
+    // Each event is a card: title, tag, Luma link, When and Venue. Tapping the card selects the event,
+    // which updates Your trip and Your route; the small "Luma" link opens the event page.
+    const url=safeUrl(e.url), c=document.createElement("article");
+    c.className="evitem";c.setAttribute("aria-current",e===current);c.tabIndex=0;
+    c.setAttribute("aria-label",(e.title||"Untitled event")+", "+fmt(e.start)+(e===current?". Selected":". Select to plan the route"));
+    c.innerHTML='<h3>'+esc(e.title||"Untitled event")+'</h3>'+
+      '<div class="evtags"><span class="tag">'+(e.registered?"Registered":e.src==="sg"?"Luma Singapore":"Added by you")+'</span>'+
+      (url?'<a class="lumalink" href="'+esc(url)+'" target="_blank" rel="noopener" aria-label="Open this event on Luma">Luma <span aria-hidden="true">↗</span></a>':'')+'</div>'+
+      '<dl class="meta"><dt>When</dt><dd>'+esc(fmt(e.start))+'</dd><dt>Venue</dt><dd class="v"></dd></dl>';
+    const v=c.querySelector(".v");
+    if(e.loc||!e.approx) v.textContent=e.loc||"No venue listed";
+    else{v.innerHTML="Hidden in Luma's public list. If you've registered, see it on Luma, or "+
+      '<button type="button" class="linkbtn">add your registration</button> to show it here.';
+      v.querySelector("button").onclick=ev=>{ev.stopPropagation();goTab("ics");$("icsfile").focus();};}
+    const pick=()=>{if(current!==e){current=e;renderDay();showEvent();}};
+    c.onclick=pick;
+    c.onkeydown=ev=>{if((ev.key==="Enter"||ev.key===" ")&&ev.target===c){ev.preventDefault();pick();}};
+    box.append(c);});
 }
 // Only follow http(s) links, so a calendar file can't inject other link types
 function safeUrl(u){try{const x=new URL(u);return /^https?:$/.test(x.protocol)?x.href:"";}catch(_){return "";}}
@@ -476,15 +492,7 @@ function guessStation(loc){
   return hit||"";
 }
 function showEvent(){
-  const e=current,url=safeUrl(e.url),h=$("ev-title");h.textContent="";
-  if(url){const a=document.createElement("a");a.href=url;a.target="_blank";a.rel="noopener";a.textContent=(e.title||"Untitled event")+" ";
-    a.insertAdjacentHTML("beforeend",'<span aria-hidden="true">↗</span>');a.title="Open on Luma";h.append(a);}
-  else h.textContent=e.title||"Untitled event";
-  $("ev-tag").textContent=e.registered?"Registered":e.src==="sg"?"Luma Singapore":"Added by you";$("ev-when").textContent=fmt(e.start);
-  if(e.loc||!e.approx) $("ev-loc").textContent=e.loc||"No venue listed";
-  else{$("ev-loc").innerHTML="Hidden in Luma's public list. If you've registered, see it on Luma, or "+
-    '<button type="button" class="linkbtn" id="addreg">add your registration</button> to show it here.';
-    $("addreg").onclick=()=>{goTab("ics");$("icsfile").focus();};}
+  const e=current;
   if(e.ll){const near=nearestStations(e.ll);$("to").value=near[0].s;
     $("tohint").textContent="Nearest to the event"+(e.approx?" area":"")+": "+near.map(x=>x.s+" (~"+Math.round(x.m/10)*10+" m)").join(", ")+". Distances are straight-line.";}
   else if(guessStation(e.loc)){const g=guessStation(e.loc);$("to").value=g;$("tohint").textContent="Matched \""+g+"\" from the venue text. Change it if that's wrong.";}
@@ -494,37 +502,64 @@ function showEvent(){
 
 // ---------- render route ----------
 function mapsLink(origin,dest,mode){return "https://www.google.com/maps/dir/?api=1&origin="+encodeURIComponent(origin)+"&destination="+encodeURIComponent(dest)+"&travelmode="+mode;}
+// Return trip: after Swap, the venue's station is where you start and the top field is where you're going
+let returnTrip=false;
+function setTripMode(ret){
+  returnTrip=ret;
+  $("lbl-from").textContent=ret?"Destination Station":"Starting Station";
+  $("lbl-to").textContent=ret?"Starting Station":"Station nearest the venue";
+  $("swap").setAttribute("aria-pressed",ret);
+  $("tripmode").textContent=ret?"Showing the trip back from the event.":"";
+  render();
+}
 function render(){
-  const from=$("from").value,to=$("to").value,box=$("route");
-  try{localStorage.setItem("lm-from",from);}catch(_){}
-  if(!from||!to){box.innerHTML='<p class="hint">Choose a starting station and the station nearest the venue to see the route.</p>';return;}
-  const venue=current&&current.loc?current.loc:current&&current.ll?current.ll.join(","):to+" MRT Station, Singapore";
+  const home=$("from").value, vs=$("to").value, box=$("route");
+  const from=returnTrip?vs:home, to=returnTrip?home:vs;
+  if(!home||!vs){box.innerHTML='<p class="hint">Choose '+(returnTrip?'a starting and a destination station':'a starting station and the station nearest the venue')+' to see the route.</p>';return;}
+  const venue=current&&current.loc?current.loc:current&&current.ll?current.ll.join(","):vs+" MRT Station, Singapore";
+  const venueName=esc(current&&current.title?current.title:"Venue");
+  const venueText=esc(current&&current.approx?"Event area (address hidden in Luma's public list)":venue);
   const r=route(from,to);
-  // Walk from the alighting station: straight line x1.3 for streets; 10 min guess when the venue's location is unknown
-  const wm=current&&current.ll&&STN_XY[to]?metres(current.ll,STN_XY[to]):null;
+  // Walk between the venue and its station: straight line x1.3 for streets; 10 min guess when the venue's location is unknown
+  const wm=current&&current.ll&&STN_XY[vs]?metres(current.ll,STN_XY[vs]):null;
   const walk=wm!=null?walkMin(wm):10, buffer=5;
+  const area=current&&current.approx?"the event area":"the event";
   const walkLine='<div class="walkline"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="13" cy="4" r="1.6"/><path d="M9 21l2.5-6.5L14 17v4M7 11.5l3-3.5 3.5 1 2 3.5 2.5 1M11.5 14.5l1-5.5"/></svg>'+
-    '~'+walk+' min walk'+(wm!=null?' (about '+Math.max(50,Math.round(wm*1.3/50)*50)+' m)':'')+' to '+(current&&current.approx?'the event area':'the event')+'</div>'+
+    '~'+walk+' min walk'+(wm!=null?' (about '+Math.max(50,Math.round(wm*1.3/50)*50)+' m)':'')+(returnTrip?' from '+area+' to '+esc(vs):' to '+area)+'</div>'+
     (wm==null?'<div class="small">Estimate: the venue\'s exact location isn\'t known.</div>':'');
-  let html="";
-  if(!r){html+='<p class="note">You\'re already at the station nearest the venue. Just walk the last stretch.</p>'+walkLine;}
+  const legsHtml=()=>r.legs.map((l,i)=>{const L=LINES[l.line],col="var("+L.c+")";
+    return '<li style="--c:'+col+'"><span class="dot"></span><div class="stn">'+esc(l.stops[0])+'</div>'+
+      '<div><span class="pill" style="--c:'+col+'">'+SHORT[l.line]+'</span>'+(i===0?"Board the ":"Change to the ")+esc(L.n)+' towards <strong>'+esc(l.toward)+'</strong></div>'+
+      '<div class="small">Ride '+l.n+' stop'+(l.n>1?"s":"")+(i<r.legs.length-1?', alight at '+esc(l.stops.at(-1))+' to change lines':', alight at '+esc(l.stops.at(-1)))+'</div></li>';}).join("");
   const ride=r?r.mins:0, total=ride+walk;
+  let html="";
+  if(!r) html+='<p class="note">'+(returnTrip?'The venue\'s station is your destination. Just walk there.':'You\'re already at the station nearest the venue. Just walk the last stretch.')+'</p>'+walkLine;
   html+='<div class="summary"><div><div class="big">~'+total+' min</div><div class="small">'+ride+' min on trains + ~'+walk+' min walk (estimate)</div></div>';
-  if(current&&current.start){const leave=new Date(current.start.getTime()-(total+buffer)*60e3);
+  if(!returnTrip&&current&&current.start){const leave=new Date(current.start.getTime()-(total+buffer)*60e3);
     html+='<div><div class="big">'+fmtT(leave)+'</div><div class="small">Leave '+esc(from)+' by this time ('+buffer+' min buffer)</div></div>';}
+  if(returnTrip&&current&&current.end){const arrive=new Date(current.end.getTime()+total*60e3);
+    html+='<div><div class="big">'+fmtT(arrive)+'</div><div class="small">Reach '+esc(to)+' about this time if you leave when the event ends ('+fmtT(current.end)+')</div></div>';}
   html+='</div><ol class="strip">';
-  if(r){
-    r.legs.forEach((l,i)=>{const L=LINES[l.line],col="var("+L.c+")";
-      html+='<li style="--c:'+col+'"><span class="dot"></span><div class="stn">'+esc(l.stops[0])+'</div>'+
-        '<div><span class="pill" style="--c:'+col+'">'+SHORT[l.line]+'</span>'+(i===0?"Board the ":"Change to the ")+esc(L.n)+' towards <strong>'+esc(l.toward)+'</strong></div>'+
-        '<div class="small">Ride '+l.n+' stop'+(l.n>1?"s":"")+(i<r.legs.length-1?', alight at '+esc(l.stops.at(-1))+' to change lines':', alight at '+esc(l.stops.at(-1)))+'</div></li>';});
-    const last=r.legs.at(-1);
-    html+='<li class="dash"><span class="dot" style="--c:var(--walk)"></span><div class="stn">'+esc(to)+' · alight here</div>'+walkLine+'<div class="small">Follow exit signs toward the venue. Check the station exit map for the closest exit.</div>'+foodButton(to)+'</li>';
+  if(returnTrip){
+    html+='<li class="dash"><span class="dot" style="--c:var(--fg)"></span><div class="stn">'+venueName+'</div><div class="small">'+venueText+'</div>'+walkLine+(r?foodButton(vs):"")+'</li>';
+    if(r){
+      html+=legsHtml();
+      html+='<li><span class="dot" style="--c:var(--fg)"></span><div class="stn">'+esc(to)+' · alight here</div><div class="small">Your destination station.</div></li>';
+    }
+    html+='</ol>';
+  }else{
+    if(r){
+      html+=legsHtml();
+      html+='<li class="dash"><span class="dot" style="--c:var(--walk)"></span><div class="stn">'+esc(to)+' · alight here</div>'+walkLine+'<div class="small">Follow exit signs toward the venue. Check the station exit map for the closest exit.</div>'+foodButton(to)+'</li>';
+    }
+    html+='<li><span class="dot" style="--c:var(--fg)"></span><div class="stn">'+venueName+'</div><div class="small">'+venueText+'</div>'+(r?"":foodButton(to))+'</li></ol>';
   }
-  html+='<li><span class="dot" style="--c:var(--fg)"></span><div class="stn">'+esc(current&&current.title?current.title:"Venue")+'</div><div class="small">'+esc(current&&current.approx?"Event area (address hidden in Luma's public list)":venue)+'</div>'+(r?"":foodButton(to))+'</li></ol>';
   html+='<div class="links">'+
-   '<a target="_blank" rel="noopener" href="'+mapsLink(to+" MRT Station, Singapore",venue,"walking")+'">Walking directions from '+esc(to)+'</a>'+
-   '<a target="_blank" rel="noopener" href="'+mapsLink(from+" MRT Station, Singapore",venue,"transit")+'">Full trip in Google Maps</a>'+
+   (returnTrip
+     ?'<a target="_blank" rel="noopener" href="'+mapsLink(venue,vs+" MRT Station, Singapore","walking")+'">Walking directions to '+esc(vs)+'</a>'+
+      '<a target="_blank" rel="noopener" href="'+mapsLink(venue,to+" MRT Station, Singapore","transit")+'">Full trip in Google Maps</a>'
+     :'<a target="_blank" rel="noopener" href="'+mapsLink(vs+" MRT Station, Singapore",venue,"walking")+'">Walking directions from '+esc(vs)+'</a>'+
+      '<a target="_blank" rel="noopener" href="'+mapsLink(from+" MRT Station, Singapore",venue,"transit")+'">Full trip in Google Maps</a>')+
    '<a target="_blank" rel="noopener" href="https://www.onemap.gov.sg/">OneMap</a>'+
    (current&&safeUrl(current.url)?'<a target="_blank" rel="noopener" href="'+esc(safeUrl(current.url))+'">Luma event page</a>':"")+'</div>';
   if(r&&r.legs.length>1) html+='<p class="hint">Interchange'+(r.legs.length>2?"s":"")+': '+r.legs.slice(0,-1).map(l=>esc(l.stops.at(-1))).join(", ")+'.</p>';
@@ -582,8 +617,14 @@ $("m-use").onclick=()=>{const d=$("m-date").value,t=$("m-time").value||"19:00";
 $("calprev").onclick=()=>{view=view.m?{y:view.y,m:view.m-1}:{y:view.y-1,m:11};renderCal();};
 $("calnext").onclick=()=>{view=view.m<11?{y:view.y,m:view.m+1}:{y:view.y+1,m:0};renderCal();};
 $("calnextev").onclick=()=>{const e=nextEvent();if(!e) return;current=e;goToDay(dayKey(e.start));showEvent();};
-let saved="";try{saved=localStorage.getItem("lm-from")||"";}catch(_){}
-$("from").value=saved&&byStation.has(saved)?saved:"Tampines";
+// The top station is saved on this phone and kept until the user picks a different one
+const savedFrom=()=>{let s="";try{s=localStorage.getItem("lm-from")||"";}catch(_){}return byStation.has(s)?s:"Tampines";};
+$("from").value=savedFrom();
+// Saved only on the outward trip; changes made while swapped are temporary and Reset undoes them
+$("from").onchange=()=>{const v=$("from").value;if(v&&!returnTrip){try{localStorage.setItem("lm-from",v);}catch(_){}}render();};
+$("swap").onclick=()=>setTripMode(!returnTrip);
+// Back to the outward trip: saved starting station, the station nearest the selected event, original labels
+$("tripreset").onclick=()=>{$("from").value=savedFrom();setTripMode(false);if(current) showEvent();};
 // UK date and time format (dd/mm/yyyy, 24-hour), shown in Singapore time
 const fmtUK=d=>d.toLocaleString("en-GB",{timeZone:"Asia/Singapore",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",hour12:false})+" (Singapore time)";
 // The deploy workflow swaps this placeholder for the time of the latest code change
